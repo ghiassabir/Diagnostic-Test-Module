@@ -97,8 +97,7 @@ const moduleMetadata = {
 };
 
 const GITHUB_JSON_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/json/';
-const GITHUB_IMAGE_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/'; // <-- YOUR IMAGE REPO URL
-
+const GITHUB_IMAGE_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/';
 
 async function loadQuizData(quizName) {
     let actualJsonFileToLoad = quizName;
@@ -165,9 +164,6 @@ const referenceSheetCloseBtn = document.getElementById('reference-sheet-close-bt
 const crossOutToolBtnMain = document.getElementById('cross-out-tool-btn-main');
 const sectionTitleHeader = document.getElementById('section-title-header');
 const passageContentEl = document.getElementById('passage-content');
-// ADD and RENAME these:
-const passageImageEl = document.getElementById('passage-image'); // New element in left pane
-const stemImageEl = document.getElementById('stem-image');       // Renamed element in right pane
 const questionTextMainEl = document.getElementById('question-text-main');
 const questionNumberBoxMainEl = document.getElementById('question-number-box-main');
 const markReviewCheckboxMain = document.getElementById('mark-review-checkbox-main');
@@ -206,6 +202,8 @@ const continueAfterBreakBtn = document.getElementById('continue-after-break-btn'
 const emailInputViewEl = document.getElementById('email-input-view');
 const studentEmailField = document.getElementById('student-email-field');
 const submitEmailBtn = document.getElementById('submit-email-btn');
+// CHANGED: Added missing DOM element definition
+const questionImage = document.getElementById('question-image');
 
 // --- Helper Functions ---
 function initializeStudentIdentifier() {
@@ -537,544 +535,6 @@ function showView(viewId) {
 }
 
 
-// REPLACE your entire existing loadQuestion function with this corrected version:
-
-function loadQuestion() {
-    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
-    
-    if (!testInterfaceViewEl.classList.contains('active')) {
-        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
-        return;
-    }
-    
-    // --- 1. COMPLETE RESET of all dynamic elements ---
-    mainContentAreaDynamic.classList.remove('single-pane');
-    passagePane.style.display = 'none';
-    sprInstructionsPane.style.display = 'none';
-    paneDivider.style.display = 'none';
-    if (passageImageEl) { passageImageEl.src = ''; passageImageEl.classList.add('hidden'); }
-    if (stemImageEl) { stemImageEl.src = ''; stemImageEl.classList.add('hidden'); }
-    if (passageContentEl) passageContentEl.innerHTML = '';
-    if (sprInstructionsContent) sprInstructionsContent.innerHTML = '';
-    if (questionTextMainEl) questionTextMainEl.innerHTML = '';
-    if (answerOptionsMainEl) { answerOptionsMainEl.innerHTML = ''; answerOptionsMainEl.style.display = 'none'; }
-    if (sprInputContainerMain) sprInputContainerMain.style.display = 'none';
-
-    // --- 2. GET DATA ---
-    const currentModuleInfo = getCurrentModule(); 
-    const currentQuestionDetails = getCurrentQuestionData();
-
-    if (!currentModuleInfo || !currentQuestionDetails) {
-        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
-        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
-        updateNavigation();
-        return;
-    }
-    
-    const answerState = getAnswerState();
-    if (!answerState) {
-        console.error("CRITICAL: answerState is null in loadQuestion. This should not happen.");
-        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Internal state error.</p>";
-        updateNavigation();
-        return;
-    }
-    questionStartTime = Date.now();
-
-    // --- 3. PREPARE DATA & HEADER ---
-    const passageTextFromJson = currentQuestionDetails.passage_content;
-    const stemTextFromJson = currentQuestionDetails.question_stem;
-    let fullImageUrl = currentQuestionDetails.image_url ? GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url : null;
-    
-    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
-    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
-    
-    const isMathTypeModule = currentModuleInfo.type === "Math";
-    if(highlightsNotesBtn) highlightsNotesBtn.classList.toggle('hidden', isMathTypeModule);
-    if(calculatorBtnHeader) calculatorBtnHeader.classList.toggle('hidden', !isMathTypeModule);
-    if(referenceBtnHeader) referenceBtnHeader.classList.toggle('hidden', !isMathTypeModule);
-
-    // --- 4. DETERMINE LAYOUT & POPULATE ---
-    if (currentQuestionDetails.question_type === 'student_produced_response') {
-        // --- LAYOUT: Two-Pane (SPR Instructions | Stem & Input) ---
-        sprInstructionsPane.style.display = 'flex';
-        paneDivider.style.display = 'block';
-
-        // Populate Left Pane (SPR Instructions)
-        if (sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
-        
-        // Populate Right Pane (Image, Stem, Input)
-        if (fullImageUrl && stemImageEl) {
-            stemImageEl.src = fullImageUrl;
-            stemImageEl.classList.remove('hidden');
-        }
-        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-        sprInputContainerMain.style.display = 'block';
-        if (sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
-        if (sprAnswerPreviewMain) sprAnswerPreviewMain.textContent = `Answer Preview: ${answerState.spr_answer || ''}`;
-        
-    } else if (currentQuestionDetails.question_type.includes('multiple_choice')) {
-        
-        if (passageTextFromJson && passageTextFromJson.trim() !== "") {
-            // --- LAYOUT: Two-Pane (Image & Passage | Stem & Options) ---
-            passagePane.style.display = 'flex';
-            paneDivider.style.display = 'block';
-
-            // Populate Left Pane
-            if (fullImageUrl && passageImageEl) {
-                passageImageEl.src = fullImageUrl;
-                passageImageEl.classList.remove('hidden');
-            }
-            if (passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
-
-            // Populate Right Pane
-            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-            
-        } else {
-            // --- LAYOUT: Single-Pane (Image, Stem, & Options) ---
-            mainContentAreaDynamic.classList.add('single-pane');
-
-            // Populate Right (Single) Pane
-            if (fullImageUrl && stemImageEl) {
-                stemImageEl.src = fullImageUrl;
-                stemImageEl.classList.remove('hidden');
-            }
-            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-        }
-
-        // Populate Answer Area (MCQ Options) for both MCQ layouts
-        answerOptionsMainEl.style.display = 'flex';
-        const options = {};
-        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
-        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
-        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
-        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
-        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
-
-        for (const [key, value] of Object.entries(options)) {
-            const isSelected = (answerState.selected === value);
-            const isCrossedOut = answerState.crossedOut.includes(key);
-            const containerDiv = document.createElement('div');
-            containerDiv.className = 'answer-option-container';
-            containerDiv.dataset.optionKey = key;
-            const optionDiv = document.createElement('div');
-            optionDiv.className = 'answer-option';
-            if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
-            if (isCrossedOut) optionDiv.classList.add('crossed-out');
-            const answerLetterDiv = document.createElement('div');
-            answerLetterDiv.className = 'answer-letter';
-            if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
-            answerLetterDiv.textContent = key;
-            const answerTextSpan = document.createElement('span');
-            answerTextSpan.className = 'answer-text';
-            if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
-            answerTextSpan.innerHTML = value; 
-            optionDiv.appendChild(answerLetterDiv);
-            optionDiv.appendChild(answerTextSpan);
-            containerDiv.appendChild(optionDiv);
-            if (isCrossOutToolActive && !isCrossedOut) {
-                const crossOutBtnIndividual = document.createElement('button');
-                crossOutBtnIndividual.className = 'individual-cross-out-btn';
-                crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-                crossOutBtnIndividual.title = `Cross out option ${key}`;
-                crossOutBtnIndividual.dataset.action = 'cross-out-individual';
-                containerDiv.appendChild(crossOutBtnIndividual);
-            } else if (isCrossedOut) {
-                const undoBtn = document.createElement('button');
-                undoBtn.className = 'undo-cross-out-btn';
-                undoBtn.textContent = 'Undo';
-                undoBtn.title = `Undo cross out for option ${key}`;
-                undoBtn.dataset.action = 'undo-cross-out';
-                containerDiv.appendChild(undoBtn);
-            }
-            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
-        }
-    }
-    
-    // --- 5. FINALIZE ---
-    if (typeof MathJax !== "undefined") {
-        if (MathJax.typesetPromise) {
-            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent]).catch(err => console.error('MathJax Typesetting Error:', err));
-        } else if (MathJax.startup && MathJax.startup.promise) {
-            MathJax.startup.promise.then(() => {
-                if(MathJax.typesetPromise) {
-                    MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent]).catch(err => console.error('MathJax Typesetting Error (after startup):', err));
-                }
-            }).catch(err => console.error("Error waiting for MathJax startup:", err));
-        }
-    }
-    updateNavigation();
-}
-
-
-/*
-// REPLACE your entire loadQuestion function with this corrected version
-
-function loadQuestion() {
-    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
-    
-    if (!testInterfaceViewEl.classList.contains('active')) {
-        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
-        return;
-    }
-    
-    // --- 1. COMPLETE RESET of all dynamic elements ---
-    mainContentAreaDynamic.classList.remove('single-pane');
-    
-    passagePane.style.display = 'none';
-    sprInstructionsPane.style.display = 'none';
-    paneDivider.style.display = 'none';
-    
-    if (passageImageEl) { passageImageEl.src = ''; passageImageEl.classList.add('hidden'); }
-    if (stemImageEl) { stemImageEl.src = ''; stemImageEl.classList.add('hidden'); }
-    
-    if (passageContentEl) passageContentEl.innerHTML = '';
-    if (sprInstructionsContent) sprInstructionsContent.innerHTML = '';
-    if (questionTextMainEl) questionTextMainEl.innerHTML = '';
-    if (answerOptionsMainEl) { answerOptionsMainEl.innerHTML = ''; answerOptionsMainEl.style.display = 'none'; }
-    if (sprInputContainerMain) sprInputContainerMain.style.display = 'none';
-
-    // --- 2. GET DATA ---
-    const currentModuleInfo = getCurrentModule(); 
-    const currentQuestionDetails = getCurrentQuestionData();
-
-    if (!currentModuleInfo || !currentQuestionDetails) {
-        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
-        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
-        updateNavigation();
-        return;
-    }
-    
-    const answerState = getAnswerState();
-    if (!answerState) { /* ... error handling ... */ return; }
-    questionStartTime = Date.now();
-
-    // --- 3. PREPARE DATA ---
-    const passageTextFromJson = currentQuestionDetails.passage_content;
-    const stemTextFromJson = currentQuestionDetails.question_stem;
-    let fullImageUrl = null;
-    if (currentQuestionDetails.image_url) {
-        fullImageUrl = GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url;
-    }
-
-    // --- (Header/Tool states remain the same) ---
-    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
-    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
-    // ... all other header/tool visibility logic ...
-
-    // --- 4. DETERMINE LAYOUT and 5. SET PANE VISIBILITY ---
-    let isTwoPane = false;
-    if (currentQuestionDetails.question_type === 'student_produced_response') {
-        isTwoPane = true;
-        sprInstructionsPane.style.display = 'flex';
-        paneDivider.style.display = 'block';
-    } else if (passageTextFromJson && passageTextFromJson.trim() !== "") {
-        isTwoPane = true;
-        passagePane.style.display = 'flex';
-        paneDivider.style.display = 'block';
-    } else {
-        isTwoPane = false;
-        mainContentAreaDynamic.classList.add('single-pane');
-    }
-
-    // --- 6. POPULATE CONTENT ---
-
-    // Populate Left Pane Content (if two-pane)
-    if (isTwoPane) {
-        if (currentQuestionDetails.question_type === 'student_produced_response') {
-            if (sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
-        } else { // It must be a passage-based MCQ
-            if (fullImageUrl && passageImageEl) {
-                passageImageEl.src = fullImageUrl;
-                passageImageEl.classList.remove('hidden');
-            }
-            if (passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
-        }
-    }
-
-    // Populate Right Pane Content
-    if (isTwoPane) { // For two-pane, stem image (if any) and stem text go in right pane
-        if (fullImageUrl && stemImageEl && passagePane.style.display === 'none') { // Only show stem image if not already shown in passage
-             stemImageEl.src = fullImageUrl;
-             stemImageEl.classList.remove('hidden');
-        }
-        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-
-    } else { // For single-pane, image (if any) and stem text go in right pane
-        if (fullImageUrl && stemImageEl) {
-            stemImageEl.src = fullImageUrl;
-            stemImageEl.classList.remove('hidden');
-        }
-        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-    }
-
-    // Populate Answer Area (Options or SPR Input)
-    if (currentQuestionDetails.question_type.includes('multiple_choice')) {
-        answerOptionsMainEl.style.display = 'flex';
-        const options = {};
-        // ... (populate options A,B,C,D,E from JSON)
-        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
-        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
-        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
-        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
-        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
-
-        for (const [key, value] of Object.entries(options)) {
-            // ... (your existing, correct option rendering code with selected, crossed-out states, etc.)
-            const isSelected = (answerState.selected === value);
-            const isCrossedOut = answerState.crossedOut.includes(key);
-            const containerDiv = document.createElement('div');
-            containerDiv.className = 'answer-option-container';
-            containerDiv.dataset.optionKey = key;
-            const optionDiv = document.createElement('div');
-            optionDiv.className = 'answer-option';
-            if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
-            if (isCrossedOut) optionDiv.classList.add('crossed-out');
-            const answerLetterDiv = document.createElement('div');
-            answerLetterDiv.className = 'answer-letter';
-            if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
-            answerLetterDiv.textContent = key;
-            const answerTextSpan = document.createElement('span');
-            answerTextSpan.className = 'answer-text';
-            if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
-            answerTextSpan.innerHTML = value; 
-            optionDiv.appendChild(answerLetterDiv);
-            optionDiv.appendChild(answerTextSpan);
-            containerDiv.appendChild(optionDiv);
-            if (isCrossOutToolActive && !isCrossedOut) {
-                const crossOutBtnIndividual = document.createElement('button');
-                crossOutBtnIndividual.className = 'individual-cross-out-btn';
-                crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-                crossOutBtnIndividual.title = `Cross out option ${key}`;
-                crossOutBtnIndividual.dataset.action = 'cross-out-individual';
-                containerDiv.appendChild(crossOutBtnIndividual);
-            } else if (isCrossedOut) {
-                const undoBtn = document.createElement('button');
-                undoBtn.className = 'undo-cross-out-btn';
-                undoBtn.textContent = 'Undo';
-                undoBtn.title = `Undo cross out for option ${key}`;
-                undoBtn.dataset.action = 'undo-cross-out';
-                containerDiv.appendChild(undoBtn);
-            }
-            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
-        }
-    } else if (currentQuestionDetails.question_type === 'student_produced_response') {
-        sprInputContainerMain.style.display = 'block';
-        if (sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
-        if (sprAnswerPreviewMain) sprAnswerPreviewMain.textContent = `Answer Preview: ${answerState.spr_answer || ''}`;
-    }
-
-    // --- 7. FINALIZE ---
-    if (typeof MathJax !== "undefined") {
-        if (MathJax.typesetPromise) {
-            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
-                .catch(err => console.error('MathJax Typesetting Error:', err));
-        } else if (MathJax.startup && MathJax.startup.promise) {
-            MathJax.startup.promise.then(() => {
-                if (MathJax.typesetPromise) {
-                     MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
-                        .catch(err => console.error('MathJax Typesetting Error (after startup.promise):', err));
-                }
-            }).catch(err => console.error("Error waiting for MathJax startup:", err));
-        }
-    }
-    updateNavigation();
-}
-*/
-
-/*
-// REPLACE your entire loadQuestion function with this one:
-function loadQuestion() {
-    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
-    
-    if (!testInterfaceViewEl.classList.contains('active')) {
-        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
-        return;
-    }
-    
-    const currentModuleInfo = getCurrentModule(); 
-    const currentQuestionDetails = getCurrentQuestionData();
-
-    // --- Reset all content areas and hide images first ---
-    passagePane.style.display = 'none';
-    if (passageContentEl) passageContentEl.innerHTML = ''; 
-    if (passageImageEl) {
-        passageImageEl.src = '';
-        passageImageEl.classList.add('hidden');
-    }
-    sprInstructionsPane.style.display = 'none';
-    if (sprInstructionsContent) sprInstructionsContent.innerHTML = ''; 
-    if (questionTextMainEl) questionTextMainEl.innerHTML = ''; 
-    if (stemImageEl) {
-        stemImageEl.src = '';
-        stemImageEl.classList.add('hidden');
-    }
-    if (answerOptionsMainEl) answerOptionsMainEl.innerHTML = ''; 
-    paneDivider.style.display = 'none';
-    mainContentAreaDynamic.classList.remove('single-pane');
-    answerOptionsMainEl.style.display = 'none'; 
-    sprInputContainerMain.style.display = 'none';
-    
-    // --- Central check for valid data ---
-    if (!currentModuleInfo || !currentQuestionDetails) {
-        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
-        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
-        updateNavigation();
-        return;
-    }
-    
-    // This getAnswerState call also ensures the answer object is initialized for the current question
-    const answerState = getAnswerState();
-    if (!answerState) {
-        console.error("CRITICAL: answerState is null in loadQuestion. This should not happen.");
-        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Internal state error.</p>";
-        updateNavigation();
-        return;
-    }
-    questionStartTime = Date.now();
-
-    // --- Populate Header/Tool states (no change from before) ---
-    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
-    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
-    // ... (all the other header/tool visibility logic remains the same)
-
-    // --- Prepare Image URL ---
-    let fullImageUrl = null;
-    if (currentQuestionDetails.image_url) {
-        fullImageUrl = GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url;
-        console.log("DEBUG loadQuestion: Constructed image URL:", fullImageUrl);
-    }
-
-    // --- NEW UNIFIED PANE & CONTENT LOGIC ---
-    const passageTextFromJson = currentQuestionDetails.passage_content;
-    const stemTextFromJson = currentQuestionDetails.question_stem;
-
-    if (currentQuestionDetails.question_type === 'student_produced_response') {
-        // SPR: Instructions Left, Stem/Input Right
-        mainContentAreaDynamic.classList.remove('single-pane');
-        sprInstructionsPane.style.display = 'flex';
-        paneDivider.style.display = 'block';
-        if (sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
-        
-        if (fullImageUrl && stemImageEl) {
-            stemImageEl.src = fullImageUrl;
-            stemImageEl.classList.remove('hidden');
-        }
-        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-        sprInputContainerMain.style.display = 'block';
-        if (sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
-        if (sprAnswerPreviewMain) sprAnswerPreviewMain.textContent = `Answer Preview: ${answerState.spr_answer || ''}`;
-        
-    } else if (currentQuestionDetails.question_type.includes('multiple_choice')) {
-        // MCQ (covers both Math and R&W)
-        answerOptionsMainEl.style.display = 'flex';
-
-        if (passageTextFromJson && passageTextFromJson.trim() !== "") {
-            // Two-pane layout (typical for R&W)
-            mainContentAreaDynamic.classList.remove('single-pane');
-            passagePane.style.display = 'flex';
-            paneDivider.style.display = 'block';
-            
-            if (fullImageUrl && passageImageEl) {
-                passageImageEl.src = fullImageUrl;
-                passageImageEl.classList.remove('hidden');
-            }
-            if (passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
-            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-
-        } else {
-            // Single-pane layout (typical for Math)
-            mainContentAreaDynamic.classList.add('single-pane');
-            if (fullImageUrl && stemImageEl) {
-                stemImageEl.src = fullImageUrl;
-                stemImageEl.classList.remove('hidden');
-            }
-            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
-        }
-
-        // MCQ Option rendering logic (this part remains the same)
-        const options = {};
-        // ... (populate options A,B,C,D,E)
-        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
-        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
-        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
-        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
-        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
-
-        for (const [key, value] of Object.entries(options)) {
-            // ... (your existing option rendering code)
-            const isSelected = (answerState.selected === value);
-            const isCrossedOut = answerState.crossedOut.includes(key);
-            const containerDiv = document.createElement('div');
-            containerDiv.className = 'answer-option-container';
-            containerDiv.dataset.optionKey = key;
-            const optionDiv = document.createElement('div');
-            optionDiv.className = 'answer-option';
-            if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
-            if (isCrossedOut) optionDiv.classList.add('crossed-out');
-            const answerLetterDiv = document.createElement('div');
-            answerLetterDiv.className = 'answer-letter';
-            if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
-            answerLetterDiv.textContent = key;
-            const answerTextSpan = document.createElement('span');
-            answerTextSpan.className = 'answer-text';
-            if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
-            answerTextSpan.innerHTML = value; 
-            optionDiv.appendChild(answerLetterDiv);
-            optionDiv.appendChild(answerTextSpan);
-            containerDiv.appendChild(optionDiv);
-            if (isCrossOutToolActive && !isCrossedOut) {
-                const crossOutBtnIndividual = document.createElement('button');
-                crossOutBtnIndividual.className = 'individual-cross-out-btn';
-                crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-                crossOutBtnIndividual.title = `Cross out option ${key}`;
-                crossOutBtnIndividual.dataset.action = 'cross-out-individual';
-                containerDiv.appendChild(crossOutBtnIndividual);
-            } else if (isCrossedOut) {
-                const undoBtn = document.createElement('button');
-                undoBtn.className = 'undo-cross-out-btn';
-                undoBtn.textContent = 'Undo';
-                undoBtn.title = `Undo cross out for option ${key}`;
-                undoBtn.dataset.action = 'undo-cross-out';
-                containerDiv.appendChild(undoBtn);
-            }
-            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
-        }
-    }
-    
-    // Call MathJax for all potentially updated content areas
-    if (typeof MathJax !== "undefined") {
-          if (MathJax.typesetPromise) {
-            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
-                .catch(function (err) { console.error('MathJax Typesetting Error:', err); });
-        } else if (MathJax.startup && MathJax.startup.promise) {
-            MathJax.startup.promise.then(() => {
-                if (MathJax.typesetPromise) {
-                     MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
-                        .catch(function (err) { console.error('MathJax Typesetting Error (after startup.promise):', err); });
-                } else {
-                    console.error("MathJax.typesetPromise still not available after startup.promise resolved.");
-                }
-            }).catch(err => console.error("Error waiting for MathJax startup:", err));
-        } else {
-            console.warn("MathJax is defined, but neither typesetPromise nor startup.promise is available. Typesetting may fail.");
-            setTimeout(() => {
-                if (typeof MathJax !== "undefined" && MathJax.typesetPromise) {
-                    MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
-                        .catch(function (err) { console.error('MathJax Typesetting Error (after delay):', err); });
-                } else {
-                     console.warn("MathJax still not ready after delay for typesetting.");
-                }
-            }, 500);
-        }
-    } else {
-        console.warn("MathJax object itself is not defined. Math content will not be rendered.");
-    }
-   updateNavigation();
-}
-*/
-
-
-/*
 // --- Core UI Update `loadQuestion()` ---
 function loadQuestion() {
     console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
@@ -1083,6 +543,20 @@ function loadQuestion() {
         console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
         return;
     }
+
+    if (questionImage) { // Check if the element exists
+    if (currentQuestionDetails.image_url) {
+        // --- CHANGED: Construct the full URL ---
+        const fullImageUrl = GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url;
+        console.log("DEBUG loadQuestion: Setting image src to:", fullImageUrl);
+        questionImage.src = fullImageUrl;
+        questionImage.classList.remove('hidden');
+    } else {
+        questionImage.classList.add('hidden');
+        questionImage.src = ''; // Clear src to prevent showing old image
+    }
+}
+
     
     const currentModuleInfo = getCurrentModule();
     const currentQuestionDetails = getCurrentQuestionData();
@@ -1251,7 +725,7 @@ function loadQuestion() {
     }
     updateNavigation();
 }
-*/
+
 // --- Event Listeners for Answer Interaction & Tools ---
 if(answerOptionsMainEl) {
     answerOptionsMainEl.addEventListener('click', function(event) {
@@ -1807,83 +1281,8 @@ if(exitExamConfirmBtn) {
 }
 
 if (submitEmailBtn) {
-    submitEmailBtn.addEventListener('click', async () => {
-          if (studentEmailField && studentEmailField.value.trim() !== "" && studentEmailField.value.includes('@')) {
-            studentEmailForSubmission = studentEmailField.value.trim();
-            localStorage.setItem('bluebookStudentEmail', studentEmailForSubmission);
-            console.log(`DEBUG submitEmailBtn: Email submitted: ${studentEmailForSubmission}, saved.`);
-             // After saving the email, we need to re-run the logic that checks for URL params to launch the test.
-            // This logic is already in DOMContentLoaded, so we can re-use it.
-            // Let's call a new function that contains this logic.
-            await proceedAfterEmail();
-
-        } else {
-            alert("Please enter a valid email address.");
-        }
-    });
+    submitEmailBtn.addEventListener('click', async () => { /* ... existing email logic ... */ });
 }
-// --- END OF BLOCK TO ADD ---
-
-// We need to wrap the post-email logic into a function that can be called
-// both by DOMContentLoaded (if email exists) and by the submitEmailBtn click.
-
-async function proceedAfterEmail() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const quizNameFromUrl = urlParams.get('quiz_name');
-    const testIdFromUrl = urlParams.get('test_id');
-
-    console.log(`DEBUG proceedAfterEmail: Email valid. Checking direct launch params: test_id=${testIdFromUrl}, quiz_name=${quizNameFromUrl}`);
-    
-    // This is the same logic that was previously inside DOMContentLoaded
-    if (testIdFromUrl) { 
-        console.log(`DEBUG proceedAfterEmail: Launching NEW full test from URL: ${testIdFromUrl}`);
-        if (fullTestDefinitions[testIdFromUrl]) {
-            currentInteractionMode = 'full_test';
-            currentTestFlow = fullTestDefinitions[testIdFromUrl].flow;
-            // Reset state for a new test
-            currentModuleIndex = 0; currentQuestionNumber = 1; userAnswers = {};
-            isTimerHidden = false; isCrossOutToolActive = false; isHighlightingActive = false;
-            currentModuleTimeUp = false; questionStartTime = 0;
-
-            if (currentTestFlow && currentTestFlow.length > 0) {
-                const firstQuizName = currentTestFlow[currentModuleIndex];
-                const moduleInfo = moduleMetadata[firstQuizName];
-                const isDtT0Module = firstQuizName.startsWith("DT-T0-");
-                const success = await loadQuizData(firstQuizName);
-                if (success && currentQuizQuestions.length > 0) {
-                    if (isDtT0Module) {
-                        startPracticeQuizTimer(); currentModuleTimeUp = true;
-                    } else if (moduleInfo && typeof moduleInfo.durationSeconds === 'number' && moduleInfo.durationSeconds > 0) {
-                        startModuleTimer(moduleInfo.durationSeconds);
-                    } else {
-                        updateModuleTimerDisplay(0); currentModuleTimeUp = true;
-                    }
-                    populateQNavGrid();
-                    showView('test-interface-view');
-                } else { alert(`Could not load initial module for test: ${testIdFromUrl}.`); showView('home-view'); }
-            } else { alert(`Test ID '${testIdFromUrl}' has no defined flow.`); showView('home-view'); }
-        } else { alert(`Unknown Test ID: ${testIdFromUrl}.`); showView('home-view'); }
-    } else if (quizNameFromUrl) {
-        console.log(`DEBUG proceedAfterEmail: Launching NEW single quiz from URL: ${quizNameFromUrl}`);
-        currentInteractionMode = 'single_quiz';
-        currentTestFlow = [quizNameFromUrl];
-        // Reset state for a new quiz
-        currentModuleIndex = 0; currentQuestionNumber = 1; userAnswers = {};
-        isTimerHidden = false; isCrossOutToolActive = false; isHighlightingActive = false;
-        currentModuleTimeUp = false; questionStartTime = 0;
-
-        const success = await loadQuizData(quizNameFromUrl);
-        if (success && currentQuizQuestions.length > 0) {
-            startPracticeQuizTimer();
-            populateQNavGrid();
-            showView('test-interface-view');
-        } else { alert(`Could not load quiz: ${quizNameFromUrl}.`); showView('home-view'); }
-    } else {
-        console.log("DEBUG proceedAfterEmail: No direct launch params. Displaying home screen.");
-        showView('home-view'); 
-    }
-}          
-    
 
 // --- DOMContentLoaded ---
 //document.addEventListener('DOMContentLoaded', async () => {
@@ -1892,65 +1291,6 @@ async function proceedAfterEmail() {
     // This is the version from my previous message that you confirmed worked.
 // --- script.js (Final and Correct DOMContentLoaded Listener) ---
 
-// --- MODIFY THE DOMContentLoaded LISTENER ---
-// Replace your entire DOMContentLoaded listener with this refactored version
-
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log("DEBUG DOMContentLoaded: Initializing application.");
-    const emailIsValid = initializeStudentIdentifier();
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    globalOriginPageId = urlParams.get('originPageId');
-    const sourceFromUrl = urlParams.get('source');
-    if (sourceFromUrl) globalQuizSource = sourceFromUrl;
-
-    const savedSessionJSON = localStorage.getItem(SESSION_STORAGE_KEY);
-    let sessionResumed = false;
-
-    if (savedSessionJSON) {
-        // ... (Your existing, working session resume logic goes here. It's complex, so keep it as is) ...
-        // For brevity, I'll represent it like this. Make sure your full resume logic is here.
-        console.log("DEBUG DOMContentLoaded: Found saved session data.");
-        try {
-            const savedSession = JSON.parse(savedSessionJSON);
-            if (savedSession && typeof savedSession.currentModuleIndex === 'number') {
-                const resumeConfirmation = confirm("An unfinished session was found. Would you like to resume it?");
-                if (resumeConfirmation) {
-                    sessionResumed = true;
-                    // ... The rest of the logic to restore the session ...
-                    // Example...
-                     // Restore state variables
-                    studentEmailForSubmission = savedSession.studentEmailForSubmission;
-                    currentInteractionMode = savedSession.currentInteractionMode || 'full_test';
-                    //... and so on for all state variables.
-                    
-                    // ... then load data, start timer, and show view ...
-                    // This part seems to be working for you, so no need to change it.
-                } else {
-                    clearSessionState();
-                }
-            } else {
-                clearSessionState();
-            }
-        } catch (e) {
-            clearSessionState();
-        }
-    }
-
-    if (!sessionResumed) {
-        console.log("DEBUG DOMContentLoaded: No session resumed.");
-        if (!emailIsValid) {
-            showView('email-input-view');
-        } else {
-            // Email is valid, so proceed directly
-            await proceedAfterEmail();
-        }
-    }
-});
-
-
-
-/*
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("DEBUG DOMContentLoaded: Initializing application.");
@@ -2109,4 +1449,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 });
-*/
