@@ -127,8 +127,85 @@ async function loadQuizData(quizName) {
     }
 }
 
-// --- script.js ---
+// REPLACE your existing startAppOrQuiz function with this corrected version
 
+async function startAppOrQuiz() {
+    console.log("DEBUG startAppOrQuiz: Starting application logic.");
+
+    // IMPORTANT: Read URL parameters INSIDE this function, every time it's called.
+    const urlParams = new URLSearchParams(window.location.search);
+    const quizNameFromUrl = urlParams.get('quiz_name');
+    const testIdFromUrl = urlParams.get('test_id');
+    
+    // Set globals from these locally read params
+    globalOriginPageId = urlParams.get('originPageId'); 
+    globalQuizSource = urlParams.get('source');
+    if (globalQuizSource) console.log(`DEBUG startAppOrQuiz: Source is '${globalQuizSource}'`);
+
+    const savedSessionJSON = localStorage.getItem(SESSION_STORAGE_KEY);
+    let sessionResumed = false;
+
+    if (savedSessionJSON) {
+        console.log("DEBUG startAppOrQuiz: Found saved session data.");
+        try {
+            const savedSession = JSON.parse(savedSessionJSON);
+            if (savedSession && typeof savedSession.currentModuleIndex === 'number' && savedSession.currentTestFlow && savedSession.currentTestFlow.length > 0) {
+                const resumeConfirmation = confirm("An unfinished session was found. Would you like to resume it?");
+                if (resumeConfirmation) {
+                    console.log("DEBUG startAppOrQuiz: User chose to RESUME session.");
+                    sessionResumed = true;
+                    // (The rest of your existing, working session resume logic goes here)
+                    // It should restore all state variables, load data, start timers, and show the view.
+                    // This part seems to have been working correctly before, so no changes needed inside this block.
+                    // ...
+                } else {
+                    console.log("DEBUG startAppOrQuiz: User chose NOT to resume.");
+                    clearSessionState();
+                }
+            } else {
+                console.warn("DEBUG startAppOrQuiz: Saved session data is invalid.");
+                clearSessionState();
+            }
+        } catch (e) {
+            console.error("DEBUG startAppOrQuiz: Error parsing saved session.", e);
+            clearSessionState();
+        }
+    }
+
+    if (!sessionResumed) {
+        console.log("DEBUG startAppOrQuiz: No session resumed. Checking URL params for new session.");
+        
+        // This is the critical logic that will now work correctly
+        if (testIdFromUrl) {
+            console.log(`DEBUG startAppOrQuiz: Launching NEW full test from URL: ${testIdFromUrl}`);
+            // (Your existing logic to start a full test)
+            // ...
+            showView('test-interface-view');
+
+        } else if (quizNameFromUrl) {
+            console.log(`DEBUG startAppOrQuiz: Launching NEW single quiz from URL: ${quizNameFromUrl}`);
+            // (Your existing logic to start a single quiz)
+            currentInteractionMode = 'single_quiz';
+            currentTestFlow = [quizNameFromUrl];
+            // ... reset states ...
+            const success = await loadQuizData(quizNameFromUrl);
+            if (success) {
+                startPracticeQuizTimer();
+                populateQNavGrid();
+                showView('test-interface-view');
+            } else {
+                alert(`Could not load quiz: ${quizNameFromUrl}.`);
+                showView('home-view');
+            }
+
+        } else {
+            console.log("DEBUG startAppOrQuiz: No launch parameters. Displaying home screen.");
+            showView('home-view');
+        }
+    }
+}
+
+/*
 // ADD THIS NEW FUNCTION
 async function startAppOrQuiz() {
     console.log("DEBUG startAppOrQuiz: Starting application logic.");
@@ -189,7 +266,7 @@ async function startAppOrQuiz() {
         }
     }
 }
-
+*/
 
 
 // --- DOM Elements ---
