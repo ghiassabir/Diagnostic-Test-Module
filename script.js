@@ -596,6 +596,148 @@ function showView(viewId) {
 }
 
 // REPLACE your entire existing loadQuestion function with this one
+
+function loadQuestion() {
+    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
+    
+    if (!testInterfaceViewEl.classList.contains('active')) {
+        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
+        return;
+    }
+    
+    const currentModuleInfo = getCurrentModule(); 
+    const currentQuestionDetails = getCurrentQuestionData(); 
+
+    if (!currentModuleInfo || !currentQuestionDetails) {
+        // ... (existing error handling for missing data)
+        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
+        updateNavigation();
+        return;
+    }
+    
+    const answerState = getAnswerState(); 
+    if (!answerState) { /* ... existing error handling ... */ return; }
+    questionStartTime = Date.now();
+
+    // --- Headers and tool visibility (No changes here) ---
+    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
+    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
+    const isMathTypeModule = currentModuleInfo.type === "Math";
+    if(highlightsNotesBtn) highlightsNotesBtn.classList.toggle('hidden', isMathTypeModule);
+    if(calculatorBtnHeader) calculatorBtnHeader.classList.toggle('hidden', !isMathTypeModule);
+    // ... (rest of the header/tool logic)
+
+    // --- Reset Panes & Content Areas ---
+    passagePane.style.display = 'none';
+    if (passageContentEl) passageContentEl.innerHTML = ''; 
+    sprInstructionsPane.style.display = 'none';
+    if (sprInstructionsContent) sprInstructionsContent.innerHTML = ''; 
+    if (questionTextMainEl) questionTextMainEl.innerHTML = ''; 
+    if (answerOptionsMainEl) answerOptionsMainEl.innerHTML = ''; 
+    paneDivider.style.display = 'none';
+    mainContentAreaDynamic.classList.remove('single-pane');
+    answerOptionsMainEl.style.display = 'none'; 
+    sprInputContainerMain.style.display = 'none';
+    
+    // --- IMPORTANT: Hide the image element by default ---
+    if (questionImage) questionImage.classList.add('hidden');
+
+
+    // --- Get Content from JSON ---
+    const passageTextFromJson = currentQuestionDetails.passage_content;
+    const stemTextFromJson = currentQuestionDetails.question_stem;
+    const imageUrlFromJson = currentQuestionDetails.image_url;
+
+    // --- Prepare Image HTML ---
+    let imageHtml = '';
+    // CHANGED: Stricter check for image URL. Only create image tag if URL is a non-empty string.
+    if (imageUrlFromJson && typeof imageUrlFromJson === 'string' && imageUrlFromJson.trim() !== '') {
+        const fullImageUrl = GITHUB_IMAGE_BASE_URL + imageUrlFromJson.trim();
+        console.log("DEBUG loadQuestion: Preparing image HTML with src:", fullImageUrl);
+        // We will now create the HTML string and inject it into the correct pane later.
+        // The id="question-image" is now applied to the image directly.
+        imageHtml = `<img id="question-image" src="${fullImageUrl}" alt="Question-related image">`;
+    }
+
+    // --- Pane Layout & Content Injection Logic ---
+    if (currentQuestionDetails.question_type === 'student_produced_response') {
+        // SPR Questions: Instructions Left, Question Right
+        mainContentAreaDynamic.classList.remove('single-pane');
+        sprInstructionsPane.style.display = 'flex';
+        paneDivider.style.display = 'block';
+        if(sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
+        if(questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '<p>Question stem missing.</p>';
+        sprInputContainerMain.style.display = 'block';
+        // ... (rest of SPR logic)
+        
+    } else if (currentQuestionDetails.question_type.includes('multiple_choice')) {
+        // This handles ALL multiple-choice questions (RW and Math)
+
+        if (currentModuleInfo.type === "RW") {
+            // R&W MCQs: Passage/Image on Left, Stem/Options on Right
+            mainContentAreaDynamic.classList.remove('single-pane');
+            passagePane.style.display = 'flex';
+            paneDivider.style.display = 'block';
+            
+            let leftPaneContent = '';
+            // CHANGED: If it's an R&W question, the image goes in the LEFT pane.
+            if (imageHtml) {
+                leftPaneContent += imageHtml;
+            }
+            if (passageTextFromJson) {
+                leftPaneContent += passageTextFromJson;
+            }
+            if(passageContentEl) passageContentEl.innerHTML = leftPaneContent || '<p>Passage content missing.</p>';
+            
+            if(questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '<p>Question stem missing.</p>';
+
+        } else { // Math MCQs (and any other non-RW MCQ)
+            // Math MCQs: Everything in a single Right Pane
+            mainContentAreaDynamic.classList.add('single-pane');
+            let rightPaneQuestionContent = '';
+            // CHANGED: If it's a Math question, the image goes in the RIGHT pane, above the stem.
+            if (imageHtml) {
+                rightPaneQuestionContent += imageHtml;
+            }
+            if (stemTextFromJson) {
+                rightPaneQuestionContent += `<p>${stemTextFromJson}</p>`;
+            }
+            if(questionTextMainEl) questionTextMainEl.innerHTML = rightPaneQuestionContent || '<p>Question content missing.</p>';
+        }
+
+        // Common logic for all MCQs: Render the options
+        answerOptionsMainEl.style.display = 'flex';
+        // ... (Your existing, working logic for rendering the A,B,C,D options can go here, no changes needed to that part)
+        const options = {};
+        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
+        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
+        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
+        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
+        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
+
+        for (const [key, value] of Object.entries(options)) {
+            // ... (your existing loop to create and append the full option containers)
+             const isSelected = (answerState.selected === value);
+            const isCrossedOut = answerState.crossedOut.includes(key);
+            const containerDiv = document.createElement('div');
+            // ... etc. ...
+            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
+        }
+    }
+
+    // --- MathJax call (No changes needed here) ---
+    if (typeof MathJax !== "undefined") {
+        // ... (your existing robust MathJax logic)
+    }
+
+    updateNavigation();
+}
+
+
+
+/*
+// REPLACE your entire existing loadQuestion function with this one
 function loadQuestion() {
     console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
     
@@ -768,7 +910,7 @@ function loadQuestion() {
 
     updateNavigation();
 }
-
+*/
 
 /*
 // --- Core UI Update `loadQuestion()` ---
