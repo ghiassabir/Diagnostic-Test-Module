@@ -533,7 +533,228 @@ function showView(viewId) {
     updateNavigation();
 }
 
+// --- Core UI Update `loadQuestion()` ---
+async function loadQuestion() {
+    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
+    
+    if (!testInterfaceViewEl.classList.contains('active')) {
+        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
+        return;
+    }
+    
+    const currentModuleInfo = getCurrentModule();
+    const currentQuestionDetails = getCurrentQuestionData();
 
+    if (!currentModuleInfo || !currentQuestionDetails) {
+        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
+        if (answerOptionsMainEl) answerOptionsMainEl.innerHTML = "";
+        updateNavigation();
+        return;
+    }
+    
+    const answerState = getAnswerState();
+    if (!answerState) {
+        console.error("CRITICAL: answerState is null in loadQuestion. This should not happen.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Internal state error.</p>";
+        updateNavigation();
+        return;
+    }
+    questionStartTime = Date.now();
+
+    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
+    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
+    
+    const isMathTypeModule = currentModuleInfo.type === "Math";
+    if(highlightsNotesBtn) highlightsNotesBtn.classList.toggle('hidden', isMathTypeModule);
+    if(calculatorBtnHeader) calculatorBtnHeader.classList.toggle('hidden', !isMathTypeModule);
+    if(referenceBtnHeader) referenceBtnHeader.classList.toggle('hidden', !isMathTypeModule);
+    if(crossOutToolBtnMain) crossOutToolBtnMain.classList.toggle('hidden', currentQuestionDetails.question_type === 'student_produced_response');
+
+    if(markReviewCheckboxMain) markReviewCheckboxMain.checked = answerState.marked;
+    if(flagIconMain) {
+        flagIconMain.style.fill = answerState.marked ? 'var(--bluebook-red-flag)' : 'none';
+        flagIconMain.style.color = answerState.marked ? 'var(--bluebook-red-flag)' : '#9ca3af';
+    }
+
+    if(mainContentAreaDynamic) mainContentAreaDynamic.classList.toggle('cross-out-active', isCrossOutToolActive && currentQuestionDetails.question_type !== 'student_produced_response');
+    if(crossOutToolBtnMain) crossOutToolBtnMain.classList.toggle('active', isCrossOutToolActive && currentQuestionDetails.question_type !== 'student_produced_response');
+
+    // START OF PANE RESET BLOCK & IMAGE RESET
+    passagePane.style.display = 'none';
+    if (passageContentEl) passageContentEl.innerHTML = '';
+    sprInstructionsPane.style.display = 'none';
+    if (sprInstructionsContent) sprInstructionsContent.innerHTML = '';
+    if (questionTextMainEl) questionTextMainEl.innerHTML = '';
+    if (answerOptionsMainEl) answerOptionsMainEl.innerHTML = '';
+    paneDivider.style.display = 'none';
+    mainContentAreaDynamic.classList.remove('single-pane');
+    answerOptionsMainEl.style.display = 'none';
+    sprInputContainerMain.style.display = 'none';
+
+    // --- UPDATED IMAGE HANDLING LOGIC START ---
+    // Always hide both images before deciding which one to show (if any)
+    if (passageImageEl) {
+        passageImageEl.src = "";
+        passageImageEl.classList.add('hidden'); // Ensure it's hidden if no image is used
+    }
+    if (questionImageEl) {
+        questionImageEl.src = "";
+        questionImageEl.classList.add('hidden'); // Ensure it's hidden if no image is used
+    }
+
+    const imageUrl = currentQuestionDetails.image_url;
+    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
+        console.log(`DEBUG loadQuestion: Found image_url: ${imageUrl}`);    
+        const fullImageUrl = `https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/${imageUrl}`;
+        console.log(`DEBUG loadQuestion: Constructed full image URL: ${fullImageUrl}`);
+        
+        // Decide which image element to use based on module type
+        const targetImageEl = (currentModuleInfo.type === 'RW') ? passageImageEl : questionImageEl;
+
+        if (targetImageEl) {
+            targetImageEl.src = fullImageUrl;
+            targetImageEl.classList.remove('hidden'); // Make it visible
+            console.log(`DEBUG loadQuestion: Set image for ${currentModuleInfo.type} in ${currentModuleInfo.type === 'RW' ? 'passage-pane' : 'question-pane'}.`);
+        }
+    }
+    // --- UPDATED IMAGE HANDLING LOGIC END ---
+    
+    const passageTextFromJson = currentQuestionDetails.passage_content;
+    const stemTextFromJson = currentQuestionDetails.question_stem;
+    console.log("DEBUG loadQuestion: passageTextFromJson:", passageTextFromJson ? passageTextFromJson.substring(0,30)+"..." : "null/empty");
+    console.log("DEBUG loadQuestion: stemTextFromJson:", stemTextFromJson ? stemTextFromJson.substring(0,30)+"..." : "null/empty");
+
+    // The pane logic needs to account for whether a passage image is present
+    const hasPassageContent = passageTextFromJson && passageTextFromJson.trim() !== "";
+    const isRwModuleWithImage = currentModuleInfo.type === 'RW' && imageUrl && imageUrl.trim() !== ""; // Explicitly check for RW with image
+
+    if (currentQuestionDetails.question_type === 'student_produced_response') {
+        mainContentAreaDynamic.classList.remove('single-pane');
+        sprInstructionsPane.style.display = 'flex';
+        paneDivider.style.display = 'block';
+
+        // Passage pane is not typically used for SPR unless it's a specific passage-based SPR.
+        // For standard SPR, it's usually single pane or SPR instructions in left.
+        // Given your current setup, SPR instructions are on the left, question on right.
+        passagePane.style.display = 'none'; // Ensure passage pane is hidden for SPR
+        if (hasPassageContent) { // If there's passage content, show passage pane
+            passagePane.style.display = 'flex';
+            if (passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
+        }
+
+        if(sprInstructionsContent) {
+            sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || 'SPR Directions Missing') + (currentModuleInfo.spr_examples_table || '');
+        }
+        if(questionTextMainEl) {
+            questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '<p>Question stem missing.</p>';
+        }
+        sprInputContainerMain.style.display = 'block';
+        if(sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
+        if(sprAnswerPreviewMain) sprAnswerPreviewMain.textContent = `Answer Preview: ${answerState.spr_answer || ''}`;
+        answerOptionsMainEl.style.display = 'none'; // Ensure MCQ options are hidden
+    } else if (currentQuestionDetails.question_type && currentQuestionDetails.question_type.includes('multiple_choice')) {
+        if (hasPassageContent || isRwModuleWithImage) { // Show two panes if there's passage text OR an RW image
+            passagePane.style.display = 'flex';
+            paneDivider.style.display = 'block';
+            mainContentAreaDynamic.classList.remove('single-pane');
+            if(passageContentEl) passageContentEl.innerHTML = passageTextFromJson; // Populate passage text even if image is there
+            if(questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '<p>Question stem missing.</p>';
+        } else { // Single pane if no passage text and no RW image
+            mainContentAreaDynamic.classList.add('single-pane');
+            passagePane.style.display = 'none';
+            sprInstructionsPane.style.display = 'none'; // Ensure SPR pane is hidden
+            paneDivider.style.display = 'none';
+            if(questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '<p>Question content missing.</p>';
+        }
+        answerOptionsMainEl.style.display = 'flex';
+        sprInputContainerMain.style.display = 'none';
+
+        if (answerOptionsMainEl) answerOptionsMainEl.innerHTML = '';
+        const options = {};
+        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
+        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
+        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
+        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
+        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
+
+        for (const [key, value] of Object.entries(options)) {
+            const isSelected = (answerState.selected === value);
+            const isCrossedOut = answerState.crossedOut.includes(key);
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'answer-option-container';
+            containerDiv.dataset.optionKey = key;
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'answer-option';
+            if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
+            if (isCrossedOut) optionDiv.classList.add('crossed-out');
+            const answerLetterDiv = document.createElement('div');
+            answerLetterDiv.className = 'answer-letter';
+            if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
+            answerLetterDiv.textContent = key;
+            const answerTextSpan = document.createElement('span');
+            answerTextSpan.className = 'answer-text';
+            if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
+            answerTextSpan.innerHTML = value;
+            optionDiv.appendChild(answerLetterDiv);
+            optionDiv.appendChild(answerTextSpan);
+            containerDiv.appendChild(optionDiv);
+            if (isCrossOutToolActive && !isCrossedOut) {
+                const crossOutBtnIndividual = document.createElement('button');
+                crossOutBtnIndividual.className = 'individual-cross-out-btn';
+                crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+                crossOutBtnIndividual.title = `Cross out option ${key}`;
+                crossOutBtnIndividual.dataset.action = 'cross-out-individual';
+                containerDiv.appendChild(crossOutBtnIndividual);
+            } else if (isCrossedOut) {
+                const undoBtn = document.createElement('button');
+                undoBtn.className = 'undo-cross-out-btn';
+                undoBtn.textContent = 'Undo';
+                undoBtn.title = `Undo cross out for option ${key}`;
+                undoBtn.dataset.action = 'undo-cross-out';
+                containerDiv.appendChild(undoBtn);
+            }
+            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
+        }
+    } else {
+        console.warn("loadQuestion: Unhandled question type or configuration:", currentQuestionDetails.question_type);
+        if(questionTextMainEl) questionTextMainEl.innerHTML = `<p>Error: Unknown question type.</p>`;
+        mainContentAreaDynamic.classList.add('single-pane');
+    }
+
+    if (typeof MathJax !== "undefined") {
+        if (MathJax.typesetPromise) {
+            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                .catch(function (err) { console.error('MathJax Typesetting Error:', err); });
+        } else if (MathJax.startup && MathJax.startup.promise) {
+            MathJax.startup.promise.then(() => {
+                if (MathJax.typesetPromise) {
+                    MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                        .catch(function (err) { console.error('MathJax Typesetting Error (after startup.promise):', err); });
+                } else {
+                    console.error("MathJax.typesetPromise still not available after startup.promise resolved.");
+                }
+            }).catch(err => console.error("Error waiting for MathJax startup:", err));
+        } else {
+            console.warn("MathJax is defined, but neither typesetPromise nor startup.promise is available. Typesetting may fail.");
+            setTimeout(() => {
+                if (typeof MathJax !== "undefined" && MathJax.typesetPromise) {
+                    MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                        .catch(function (err) { console.error('MathJax Typesetting Error (after delay):', err); });
+                } else {
+                    console.warn("MathJax still not ready after delay for typesetting.");
+                }
+            }, 500);
+        }
+    } else {
+        console.warn("MathJax object itself is not defined. Math content will not be rendered.");
+    }
+    updateNavigation();
+}
+
+
+
+/*
 // --- Core UI Update `loadQuestion()` ---
 function loadQuestion() {
     console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
@@ -751,7 +972,7 @@ function loadQuestion() {
     }
     updateNavigation();
 }
-
+*/
 // --- Event Listeners for Answer Interaction & Tools ---
 if(answerOptionsMainEl) {
     answerOptionsMainEl.addEventListener('click', function(event) {
