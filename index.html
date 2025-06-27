@@ -5,7 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diagnostic Test Launcher</title>
     <style>
-        /* ... (Keep ALL your existing CSS from index.html) ... */
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Inter', sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f4f8; color: #1e293b;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .launcher-container {
+            background-color: white; padding: 2.5rem 3rem; border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center;
+            border: 1px solid #e2e8f0; max-width: 500px; width: 90%;
+        }
+        .launcher-header {
+            display: flex; flex-direction: column; align-items: center;
+            margin-bottom: 2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1.5rem;
+        }
+        .launcher-logo { font-size: 1.75rem; font-weight: bold; color: #003366; margin-bottom: 0.5rem; }
+        .launcher-title { font-size: 1.25rem; font-weight: 600; color: #475569; }
+        .module-buttons-container { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+        .module-button {
+            display: block; width: 100%; padding: 1rem; font-size: 1.125rem; font-weight: 600;
+            border-radius: 0.5rem; border: 2px solid #a5b4fc; 
+            cursor: pointer; text-decoration: none; transition: all 0.2s ease-in-out; 
+            box-sizing: border-box; background-color: #e0e7ff; color: #3730a3;
+            position: relative;
+        }
+        .module-button:hover { background-color: #c7d2fe; border-color: #818cf8; }
+        .module-button.completed {
+            background-color: #d1fae5; color: #065f46; border-color: #6ee7b7;
+        }
+        .module-button.completed::after {
+            content: '✔'; position: absolute; right: 1.25rem;
+            font-size: 1.5rem; font-weight: bold; color: #15803d;
+        }
+        .results-button { border-color: #d1d5db; background-color: #e5e7eb; color: #4b5563; }
+        .results-button.active { background-color: #facc15; color: #422006; border-color: #facc15; }
+        .results-button.active:hover { background-color: #eab308; }
         .modal-overlay {
             position: fixed; inset: 0; background-color: rgba(0,0,0,0.6);
             display: none; align-items: center; justify-content: center; z-index: 100;
@@ -27,21 +62,22 @@
 </head>
 <body>
     <div class="launcher-container">
-        <!-- ... (Your existing launcher header and module buttons) ... -->
         <div class="launcher-header">
-            <!-- ... -->
+            <h1 class="launcher-logo">SAT Hub</h1>
+            <h2 class="launcher-title">Diagnostic Test</h2>
         </div>
+        
         <div class="module-buttons-container">
             <a id="module1-btn" data-module-key="DT-T0-RW-M1_completed" href="quiz.html?quiz_name=DT-T0-RW-M1&originPageId=index&source=diagnostic" class="module-button">Reading & Writing - Module 1</a>
             <a id="module2-btn" data-module-key="DT-T0-RW-M2_completed" href="quiz.html?quiz_name=DT-T0-RW-M2&originPageId=index&source=diagnostic" class="module-button">Reading & Writing - Module 2</a>
             <a id="module3-btn" data-module-key="DT-T0-MT-M1_completed" href="quiz.html?quiz_name=DT-T0-MT-M1&originPageId=index&source=diagnostic" class="module-button">Math - Module 1</a>
             <a id="module4-btn" data-module-key="DT-T0-MT-M2_completed" href="quiz.html?quiz_name=DT-T0-MT-M2&originPageId=index&source=diagnostic" class="module-button">Math - Module 2</a>
         </div>
-        <a id="results-btn" href="YOUR_DASHBOARD_URL_HERE.html" class="module-button results-button">View Results</a>
+
+        <a id="results-btn" data-module-key="results" href="YOUR_DASHBOARD_URL_HERE.html" class="module-button results-button">View Results</a>
         <button id="reset-progress-btn" style="margin-top: 1rem; font-size: 0.8rem; color: #64748b; background: none; border: none; cursor: pointer; text-decoration: underline;">Reset Progress</button>
     </div>
 
-    <!-- THIS WAS THE MISSING HTML BLOCK -->
     <div id="email-modal" class="modal-overlay">
         <div class="modal-content">
             <h2>Enter Your Email</h2>
@@ -50,63 +86,81 @@
             <button id="email-modal-submit">Continue to Quiz</button>
         </div>
     </div>
-    <!-- END OF MISSING HTML BLOCK -->
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             console.log("Launcher page (index.html) script loaded.");
             
-            // This part will now work because the HTML for the modal exists
+            // --- ELEMENT SELECTION ---
             const emailModal = document.getElementById('email-modal');
             const emailInput = document.getElementById('email-modal-input');
             const emailSubmitBtn = document.getElementById('email-modal-submit');
+            const resetBtn = document.getElementById('reset-progress-btn');
+            const allModuleButtons = document.querySelectorAll('.module-button');
             let targetUrl = '';
 
-            // ... (The rest of your script from the previous message)
-            // It should be correct and can remain as is.
+            // --- CONSTANTS ---
             const DIAGNOSTIC_STATE_KEY = 'diagnosticTestState';
 
-            const getDiagnosticState = () => { /* ... */ };
-            const updateVisuals = () => { /* ... */ };
+            // --- HELPER FUNCTIONS ---
+            const getDiagnosticState = () => {
+                const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+                console.log(`Launcher reading '${DIAGNOSTIC_STATE_KEY}':`, stateJSON);
+                return stateJSON ? JSON.parse(stateJSON) : {};
+            };
 
-            document.querySelectorAll('.module-button').forEach(button => {
+            const updateVisuals = () => {
+                console.log("Running updateVisuals()...");
+                const state = getDiagnosticState();
+                
+                allModuleButtons.forEach(button => {
+                    const moduleKey = button.dataset.moduleKey;
+                    if (!moduleKey) return;
+
+                    button.classList.remove('completed', 'active');
+
+                    if (button.id === 'results-btn') {
+                        const allDone = state['DT-T0-RW-M1_completed'] && state['DT-T0-RW-M2_completed'] && state['DT-T0-MT-M1_completed'] && state['DT-T0-MT-M2_completed'];
+                        button.classList.toggle('active', allDone);
+                    } else {
+                        if (state[moduleKey]) {
+                            button.classList.add('completed');
+                        }
+                    }
+                });
+            };
+
+            // --- EVENT LISTENERS ---
+            allModuleButtons.forEach(button => {
                 button.addEventListener('click', function(event) {
                     event.preventDefault(); 
                     const state = getDiagnosticState();
                     const moduleKey = this.dataset.moduleKey;
 
-                    if (this.id === 'results-btn') { /* ... */ return; }
-                    if (state[moduleKey]) { alert("You have already submitted this module."); return; }
-                    
+                    // Logic for View Results button
+                    if (this.id === 'results-btn') {
+                        if (this.classList.contains('active')) {
+                            console.log("Navigating to results page.");
+                            window.location.href = this.href;
+                        } else {
+                            alert("Please complete all four diagnostic modules before viewing results.");
+                        }
+                        return;
+                    }
+
+                    // Logic for Module buttons
+                    if (state[moduleKey]) {
+                        alert("You have already submitted this module. Reset progress to take it again.");
+                        return;
+                    }
+
                     targetUrl = this.href;
                     const storedEmail = localStorage.getItem('bluebookStudentEmail');
                     if (storedEmail && storedEmail.includes('@')) {
                         window.location.href = targetUrl;
                     } else {
+                        emailInput.value = '';
                         emailModal.classList.add('visible');
                     }
                 });
-            });
-
-            emailSubmitBtn.addEventListener('click', () => {
-                const email = emailInput.value.trim();
-                if (email && email.includes('@')) {
-                    localStorage.setItem('bluebookStudentEmail', email);
-                    window.location.href = targetUrl;
-                } else {
-                    alert("Please enter a valid email address.");
-                }
-            });
-
-            document.getElementById('reset-progress-btn').addEventListener('click', () => {
-                if (confirm("Are you sure you want to reset all progress?")) {
-                    localStorage.removeItem(DIAGNOSTIC_STATE_KEY);
-                    updateVisuals();
-                }
-            });
-
-            updateVisuals();
-        });
-    </script>
-</body>
-</html>
+            
