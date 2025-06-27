@@ -597,11 +597,11 @@ function loadQuestion() {
         // Reset both image elements first
         if (passageImageEl) {
             passageImageEl.src = "";
-            passageImageEl.classList.add('hidden');
+            passageImageEl.style.display = 'none';
         }
         if (questionImageEl) {
             questionImageEl.src = "";
-            questionImageEl.classList.add('hidden');
+            questionImageEl.style.display = 'none';
         }
 
         const imageUrl = currentQuestionDetails.image_url;
