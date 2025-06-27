@@ -1,104 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnostic Test Launcher</title>
-    <style>
-        /* ... (Keep ALL your existing CSS from index.html) ... */
-        
-        /* ADD THIS NEW CSS FOR THE EMAIL MODAL */
-        .modal-overlay {
-            position: fixed; inset: 0; background-color: rgba(0,0,0,0.6);
-            display: none; /* Hidden by default */
-            align-items: center; justify-content: center;
-            z-index: 100;
+// In quiz.html's script.js
+if (submitEmailBtn) {
+    submitEmailBtn.addEventListener('click', () => { 
+        console.log("DEBUG: Fallback email prompt's Continue button clicked.");
+        if (studentEmailField && studentEmailField.value.trim() !== "" && studentEmailField.value.includes('@')) {
+            studentEmailForSubmission = studentEmailField.value.trim();
+            localStorage.setItem('bluebookStudentEmail', studentEmailForSubmission);
+            console.log(`DEBUG submitEmailBtn: Email submitted and saved: ${studentEmailForSubmission}`);
+            
+            // Disable the button to prevent multiple clicks and provide feedback
+            submitEmailBtn.disabled = true;
+            submitEmailBtn.textContent = 'Processing...';
+
+            startAppOrQuiz(); // Call the main logic function
+
+        } else {
+            alert("Please enter a valid email address.");
+            // Re-enable button if input was invalid
+            submitEmailBtn.disabled = false;
+            submitEmailBtn.textContent = 'Continue';
         }
-        .modal-overlay.visible {
-            display: flex;
-        }
-        .modal-content {
-            background-color: white; padding: 2.5rem; border-radius: 0.75rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;
-            text-align: center;
-        }
-        .modal-content h2 { font-size: 1.75rem; font-weight: bold; margin-bottom: 1rem; color: #003366; }
-        .modal-content p { font-size: 1rem; color: #475569; margin-bottom: 1.5rem; }
-        .modal-content input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e0; border-radius: 0.375rem; margin-bottom: 1.5rem; font-size: 1rem; box-sizing: border-box; }
-        .modal-content button {
-            padding: 0.75rem 3rem; width: 100%; border-radius: 9999px; font-weight: bold; font-size: 1rem;
-            cursor: pointer; border: none; background-color: #facc15; color: #422006;
-        }
-    </style>
-</head>
-<body>
-    <div class="launcher-container">
-        <!-- ... (Your existing launcher header and module buttons) ... -->
-        <div class="launcher-header">
-            <h1 class="launcher-logo">SAT Hub</h1>
-            <h2 class="launcher-title">Diagnostic Test</h2>
-        </div>
-        <div class="module-buttons-container">
-            <a id="module1-btn" href="quiz.html?quiz_name=DT-T0-RW-M1&originPageId=index&source=diagnostic" class="module-button">Reading & Writing - Module 1</a>
-            <!-- ... other module buttons ... -->
-        </div>
-        <a id="results-btn" href="YOUR_DASHBOARD_URL_HERE.html" class="module-button results-button disabled">View Results</a>
-    </div>
-
-    <!-- ADD THIS NEW EMAIL MODAL OVERLAY TO THE BODY -->
-    <div id="email-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h2>Enter Your Email</h2>
-            <p>Please enter your email to start your session.</p>
-            <input type="email" id="email-modal-input" placeholder="your.email@example.com">
-            <button id="email-modal-submit">Continue to Quiz</button>
-        </div>
-    </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("Launcher page script loaded.");
-
-            const emailModal = document.getElementById('email-modal');
-            const emailInput = document.getElementById('email-modal-input');
-            const emailSubmitBtn = document.getElementById('email-modal-submit');
-            let targetUrl = ''; // To store the quiz URL the user intended to go to
-
-            // Attach click listeners to all module buttons
-            document.querySelectorAll('.module-button.active').forEach(button => {
-                button.addEventListener('click', function(event) {
-                    event.preventDefault(); // Stop the navigation immediately
-                    
-                    const storedEmail = localStorage.getItem('bluebookStudentEmail');
-                    targetUrl = this.href; // Store the URL they wanted to go to
-
-                    if (storedEmail && storedEmail.includes('@')) {
-                        console.log("Email found in localStorage. Proceeding to quiz.");
-                        window.location.href = targetUrl; // Navigate immediately
-                    } else {
-                        console.log("No email found. Showing email modal.");
-                        emailModal.classList.add('visible'); // Show the modal
-                    }
-                });
-            });
-
-            // Handle the submission from the email modal
-            emailSubmitBtn.addEventListener('click', () => {
-                const email = emailInput.value;
-                if (email && email.trim() !== "" && email.includes('@')) {
-                    localStorage.setItem('bluebookStudentEmail', email.trim());
-                    console.log(`Email saved: ${email.trim()}. Navigating to: ${targetUrl}`);
-                    emailModal.classList.remove('visible');
-                    window.location.href = targetUrl; // Now navigate to the stored URL
-                } else {
-                    alert("Please enter a valid email address.");
-                }
-            });
-
-            // This part just updates the button states on page load, it doesn't handle clicks
-            const updateButtonStates = () => { /* ... your existing, working updateButtonStates function ... */ };
-            updateButtonStates();
-        });
-    </script>
-</body>
-</html>
+    });
+}
