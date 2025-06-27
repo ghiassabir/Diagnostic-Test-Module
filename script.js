@@ -75,8 +75,6 @@ let globalQuizSource = null;
 const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwneCF0xq9X-F-9AIxAiHpYFmRTErCzCPXlsWRloLRDWBGqwLEZC4NldCCAuND0jxUL/exec';
 const SESSION_STORAGE_KEY = 'bluebookQuizSession';
 
-const DIAGNOSTIC_STATE_KEY = 'diagnosticTestState'; 
-
 const fullTestDefinitions = {
     "DT-T0": {
         flow: ["DT-T0-RW-M1", "DT-T0-RW-M2", "DT-T0-MT-M1", "DT-T0-MT-M2"],
@@ -313,9 +311,15 @@ function startModuleTimer(durationSeconds) {
             currentModuleTimeLeft = 0;
             currentModuleTimeUp = true;
             updateModuleTimerDisplay(currentModuleTimeLeft);
+            
             const completedModuleIndexForTimer = currentModuleIndex;
+            //const completedQuizNameForTimer = currentTestFlow[completedModuleIndexForTimer];
+            console.log(`Module time is up for ${completedQuizNameForTimer}!`);
+            
             recordTimeOnCurrentQuestion();
-            submitCurrentModuleData(completedModuleIndexForTimer, (completedModuleIndexForTimer === currentTestFlow.length - 1 && currentInteractionMode === 'full_test'));
+            
+            //submitCurrentModuleData(completedModuleIndexForTimer, (completedModuleIndexForTimer === currentTestFlow.length - 1 && currentInteractionMode === 'full_test'));
+            
             alert("Time for this module is up! You will be taken to the review page.");
             if (currentView !== 'review-page-view') {
                 showView('review-page-view');
@@ -864,26 +868,7 @@ async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = 
         return true;
     }
     console.log(`DEBUG submitCurrentModuleData: Submitting for module ${quizNameForSubmission}:`, submissions);
-    // CHANGED: ADD this block to save completion state
-    
-    // If submission is successful (or even if it just finishes attempt), mark module as completed.
-    //if (globalQuizSource === 'diagnostic') {
-     const quizNameForCompletionCheck = currentTestFlow[moduleIndexToSubmit];
-    if (quizNameForCompletionCheck && quizNameForCompletionCheck.startsWith("DT-T0-")) {
-        try {
-            const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
-            const state = stateJSON ? JSON.parse(stateJSON) : {};
-            const completedQuizName = currentTestFlow[moduleIndexToSubmit]; // e.g., "DT-T0-RW-M1"
-            state[completedQuizName + '_completed'] = true;
-            localStorage.setItem(DIAGNOSTIC_STATE_KEY, JSON.stringify(state));
-            console.log(`DEBUG submitCurrentModuleData: Marked ${completedQuizName} as completed in localStorage.`);
-        } catch (e) {
-            console.error("Error updating diagnostic completion state in localStorage", e);
-        }
-    }
-    // END CHANGED
-    
-        if (APPS_SCRIPT_WEB_APP_URL === 'YOUR_CORRECT_BLUEBOOK_APPS_SCRIPT_URL_HERE' || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
+    if (APPS_SCRIPT_WEB_APP_URL === 'YOUR_CORRECT_BLUEBOOK_APPS_SCRIPT_URL_HERE' || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
         console.warn("APPS_SCRIPT_WEB_APP_URL not set or invalid. Submission will not proceed for module " + quizNameForSubmission);
         alert("Submission URL not configured. Data for module " + quizNameForSubmission + " logged to console.");
         return false;
@@ -998,7 +983,28 @@ async function reviewNextButtonClickHandler() {
     saveSessionState();
 
     const moduleIndexJustCompleted = currentModuleIndex;
+    const quizNameJustCompleted = currentTestFlow[moduleIndexJustCompleted];
 
+    // This call already submits the data
+    await submitCurrentModuleData(moduleIndexJustCompleted, (moduleIndexJustCompleted === currentTestFlow.length - 1)); 
+
+    // --- NEW LOGIC FOR DIAGNOSTIC HUB ---
+    // Check if we came from the diagnostic hub page
+    if (globalOriginPageId === 'index') { // Assumes originPageId is 'index' for diagnostic hub
+        console.log("DEBUG: Updating diagnostic test state from quiz player.");
+        const DIAGNOSTIC_TEST_STATE_KEY = 'diagnosticTestState_DT-T0'; // Must match key in index.html
+        let diagnosticStateJSON = localStorage.getItem(DIAGNOSTIC_TEST_STATE_KEY);
+        let diagnosticState = diagnosticStateJSON ? JSON.parse(diagnosticStateJSON) : {};
+        
+        // Mark the module just completed as true
+        diagnosticState[quizNameJustCompleted] = true; 
+        
+        localStorage.setItem(DIAGNOSTIC_TEST_STATE_KEY, JSON.stringify(diagnosticState));
+        console.log(`Updated diagnostic test state for ${quizNameJustCompleted}. State is now:`, diagnosticState);
+    }
+    // --- END OF NEW LOGIC ---
+
+    
     if (currentInteractionMode === 'single_quiz') {
         console.log("DEBUG reviewNextBtnHandler: Single quiz finished. Submitting module data.");
         await submitCurrentModuleData(moduleIndexJustCompleted, true);
@@ -1092,9 +1098,7 @@ if(backBtnFooter) {
 if(returnToHomeBtn) {
     returnToHomeBtn.addEventListener('click', () => {
         console.log(`DEBUG returnToHomeBtn: Clicked. globalOriginPageId: '${globalOriginPageId}'`);
-        
         clearSessionState();
-        
         if (globalOriginPageId && globalOriginPageId.trim() !== "") {
             let returnUrl = "";
             if (window.location.pathname.includes("/quiz-player/")) {
