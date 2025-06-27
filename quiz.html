@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostic Test Launcher</title>
+    <!-- You can link to an external style.css or use inline styles -->
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Inter', sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #1e293b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .launcher-container {
+            background-color: white;
+            padding: 2.5rem 3rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            max-width: 500px;
+            width: 90%;
+        }
+        .launcher-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 1.5rem;
+        }
+        .launcher-logo {
+            font-size: 1.75rem;
+            font-weight: bold;
+            color: #003366; /* Bluebook Dark Blue */
+            margin-bottom: 0.5rem;
+        }
+        .launcher-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        .module-buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .module-button {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            border: 2px solid transparent;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+            box-sizing: border-box;
+        }
+        .module-button.active {
+            background-color: #2563eb; /* Bluebook Button Blue */
+            color: white;
+            border-color: #2563eb;
+        }
+        .module-button.active:hover {
+            background-color: #1d4ed8;
+        }
+        .module-button.completed {
+            background-color: #e0e7ff; /* Bluebook Footer Blue */
+            color: #4338ca;
+            border-color: #a5b4fc;
+            cursor: not-allowed;
+            opacity: 0.8;
+            position: relative;
+        }
+        .module-button.completed::after {
+            content: '✔ Completed';
+            position: absolute;
+            right: 1rem;
+            font-weight: bold;
+            color: #16a34a; /* Green */
+        }
+        .module-button.disabled {
+            background-color: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .results-button {
+            background-color: #facc15; /* Bluebook Yellow */
+            color: #422006;
+            border-color: #facc15;
+        }
+        .results-button:hover {
+            background-color: #eab308;
+        }
+    </style>
+</head>
+<body>
+    <div class="launcher-container">
+        <div class="launcher-header">
+            <h1 class="launcher-logo">SAT Hub</h1>
+            <h2 class="launcher-title">Diagnostic Test</h2>
+        </div>
+        
+        <div class="module-buttons-container">
+            <!-- R&W Module 1 -->
+            <a id="module1-btn" href="quiz.html?quiz_name=DT-T0-RW-M1&originPageId=diagnostic&source=diagnostic" 
+               class="module-button">
+                Reading & Writing - Module 1
+            </a>
+
+            <!-- R&W Module 2 -->
+            <a id="module2-btn" href="quiz.html?quiz_name=DT-T0-RW-M2&originPageId=diagnostic&source=diagnostic" 
+               class="module-button">
+                Reading & Writing - Module 2
+            </a>
+
+            <!-- Math Module 1 -->
+            <a id="module3-btn" href="quiz.html?quiz_name=DT-T0-MT-M1&originPageId=diagnostic&source=diagnostic" 
+               class="module-button">
+                Math - Module 1
+            </a>
+
+            <!-- Math Module 2 -->
+            <a id="module4-btn" href="quiz.html?quiz_name=DT-T0-MT-M2&originPageId=diagnostic&source=diagnostic" 
+               class="module-button">
+                Math - Module 2
+            </a>
+        </div>
+
+        <a id="results-btn" href="YOUR_DASHBOARD_URL_HERE.html" class="module-button results-button disabled">
+            View Results
+        </a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const module1Btn = document.getElementById('module1-btn');
+            const module2Btn = document.getElementById('module2-btn');
+            const module3Btn = document.getElementById('module3-btn');
+            const module4Btn = document.getElementById('module4-btn');
+            const resultsBtn = document.getElementById('results-btn');
+            const DIAGNOSTIC_STATE_KEY = 'diagnosticTestState';
+
+            // Function to get the current state from localStorage
+            function getDiagnosticState() {
+                const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+                // Default state if nothing is saved yet
+                return stateJSON ? JSON.parse(stateJSON) : {
+                    DT_T0_RW_M1_completed: false,
+                    DT_T0_RW_M2_completed: false,
+                    DT_T0_MT_M1_completed: false,
+                    DT_T0_MT_M2_completed: false
+                };
+            }
+            
+            // Function to update the button states based on completion status
+            function updateButtonStates() {
+                const state = getDiagnosticState();
+                
+                // --- Module 1 Button ---
+                if (state.DT_T0_RW_M1_completed) {
+                    module1Btn.classList.remove('active', 'disabled');
+                    module1Btn.classList.add('completed');
+                    module1Btn.href = "#"; // Prevent re-taking
+                } else {
+                    module1Btn.classList.remove('completed', 'disabled');
+                    module1Btn.classList.add('active');
+                }
+
+                // --- Module 2 Button ---
+                if (state.DT_T0_RW_M2_completed) {
+                    module2Btn.classList.remove('active', 'disabled');
+                    module2Btn.classList.add('completed');
+                    module2Btn.href = "#";
+                } else if (state.DT_T0_RW_M1_completed) {
+                    module2Btn.classList.remove('completed', 'disabled');
+                    module2Btn.classList.add('active');
+                } else {
+                    module2Btn.classList.remove('active', 'completed');
+                    module2Btn.classList.add('disabled');
+                    module2Btn.href = "#";
+                }
+
+                // --- Module 3 Button ---
+                if (state.DT_T0_MT_M1_completed) {
+                    module3Btn.classList.remove('active', 'disabled');
+                    module3Btn.classList.add('completed');
+                    module3Btn.href = "#";
+                } else if (state.DT_T0_RW_M2_completed) {
+                    module3Btn.classList.remove('completed', 'disabled');
+                    module3Btn.classList.add('active');
+                } else {
+                    module3Btn.classList.remove('active', 'completed');
+                    module3Btn.classList.add('disabled');
+                    module3Btn.href = "#";
+                }
+
+                // --- Module 4 Button ---
+                if (state.DT_T0_MT_M2_completed) {
+                    module4Btn.classList.remove('active', 'disabled');
+                    module4Btn.classList.add('completed');
+                    module4Btn.href = "#";
+                } else if (state.DT_T0_MT_M1_completed) {
+                    module4Btn.classList.remove('completed', 'disabled');
+                    module4Btn.classList.add('active');
+                } else {
+                    module4Btn.classList.remove('active', 'completed');
+                    module4Btn.classList.add('disabled');
+                    module4Btn.href = "#";
+                }
+
+                // --- Results Button ---
+                if (state.DT_T0_MT_M2_completed) {
+                    resultsBtn.classList.remove('disabled');
+                    resultsBtn.classList.add('active');
+                } else {
+                    resultsBtn.classList.remove('active');
+                    resultsBtn.classList.add('disabled');
+                    resultsBtn.href = "#";
+                }
+            }
+
+            // Initial state update on page load
+            updateButtonStates();
+        });
+    </script>
+</body>
+</html>
