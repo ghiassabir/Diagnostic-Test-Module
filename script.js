@@ -127,6 +127,71 @@ async function loadQuizData(quizName) {
     }
 }
 
+// --- script.js ---
+
+// ADD THIS NEW FUNCTION
+async function startAppOrQuiz() {
+    console.log("DEBUG startAppOrQuiz: Starting application logic.");
+    // This function contains the logic that was previously in DOMContentLoaded
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const quizNameFromUrl = urlParams.get('quiz_name');
+    const testIdFromUrl = urlParams.get('test_id');
+
+    // globalOriginPageId and globalQuizSource are already set by DOMContentLoaded, so we can use them here.
+
+    const savedSessionJSON = localStorage.getItem(SESSION_STORAGE_KEY);
+    let sessionResumed = false;
+
+    if (savedSessionJSON) {
+        // ... (The entire session resume logic from your working script) ...
+        // This includes parsing, validating, the confirm() prompt, and restoring state.
+        // It should end with `sessionResumed = true;` on success.
+        console.log("DEBUG startAppOrQuiz: Found saved session data.");
+        try {
+            const savedSession = JSON.parse(savedSessionJSON);
+            if (savedSession && typeof savedSession.currentModuleIndex === 'number' && savedSession.currentTestFlow) {
+                const resumeConfirmation = confirm("An unfinished session was found. Would you like to resume it?");
+                if (resumeConfirmation) {
+                    sessionResumed = true;
+                    // ... (Restore all state variables like currentInteractionMode, currentTestFlow, etc.)
+                    currentInteractionMode = savedSession.currentInteractionMode || 'full_test';
+                    currentTestFlow = savedSession.currentTestFlow;
+                    // ... and so on for all state variables.
+                    
+                    const quizNameToLoadForResume = savedSession.currentTestFlow[savedSession.currentModuleIndex];
+                    const success = await loadQuizData(quizNameToLoadForResume);
+                    if (success) {
+                        // ... (Restore timers and showView('test-interface-view'))
+                    } else {
+                        sessionResumed = false; clearSessionState();
+                    }
+                } else {
+                    clearSessionState();
+                }
+            } else {
+                clearSessionState();
+            }
+        } catch (e) {
+            clearSessionState();
+        }
+    }
+
+    if (!sessionResumed) {
+        console.log("DEBUG startAppOrQuiz: No session resumed. Checking URL params for new session.");
+        // This is the logic for starting a NEW session
+        if (testIdFromUrl) {
+            // ... (Your existing logic to start a full test) ...
+        } else if (quizNameFromUrl) {
+            // ... (Your existing logic to start a single quiz) ...
+        } else {
+            // ... (Your existing logic to show the fallback home-view) ...
+        }
+    }
+}
+
+
+
 // --- DOM Elements ---
 const allAppViews = document.querySelectorAll('.app-view');
 const homeViewEl = document.getElementById('home-view');
@@ -1415,7 +1480,20 @@ if(exitExamConfirmBtn) {
 }
 
 if (submitEmailBtn) {
-    submitEmailBtn.addEventListener('click', async () => { /* ... existing email logic ... */ });
+    submitEmailBtn.addEventListener('click', async () => { 
+    if (studentEmailField && studentEmailField.value.trim() !== "" && studentEmailField.value.includes('@')) {
+            studentEmailForSubmission = studentEmailField.value.trim();
+            localStorage.setItem('bluebookStudentEmail', studentEmailForSubmission);
+            console.log(`DEBUG submitEmailBtn: Email submitted and saved: ${studentEmailForSubmission}`);
+            
+            // CHANGED: Call the main app logic function now that email is set
+            startAppOrQuiz();
+
+        } else {
+            alert("Please enter a valid email address.");
+        }
+        
+    });
 }
 
 // --- DOMContentLoaded ---
@@ -1429,6 +1507,7 @@ if (submitEmailBtn) {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("DEBUG DOMContentLoaded: Initializing application.");
     const emailIsValid = initializeStudentIdentifier();
+    
     const urlParams = new URLSearchParams(window.location.search);
     const quizNameFromUrl = urlParams.get('quiz_name');
     const testIdFromUrl = urlParams.get('test_id');
