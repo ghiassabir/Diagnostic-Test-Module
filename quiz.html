@@ -48,6 +48,14 @@
         }
         .app-view.active { display: flex; }
 
+        #question-image {
+        max-width: 70%; /* Image will not exceed 70% of its container's width */
+        height: auto;   /* Maintain aspect ratio */
+        margin: 0 auto 1rem auto; /* Center the image and add space below */
+        border: 1px solid var(--bluebook-border-color);
+        border-radius: 0.25rem;
+        }
+        
         /* --- Test Interface & Review Page & Break View Common Header Styles --- */
         .test-interface-view .app-header, 
         .review-page-view .app-header { 
