@@ -97,7 +97,6 @@ const moduleMetadata = {
 };
 
 const GITHUB_JSON_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/json/';
-const GITHUB_IMAGE_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/';
 
 async function loadQuizData(quizName) {
     let actualJsonFileToLoad = quizName;
@@ -202,8 +201,6 @@ const continueAfterBreakBtn = document.getElementById('continue-after-break-btn'
 const emailInputViewEl = document.getElementById('email-input-view');
 const studentEmailField = document.getElementById('student-email-field');
 const submitEmailBtn = document.getElementById('submit-email-btn');
-// CHANGED: Added missing DOM element definition
-const questionImage = document.getElementById('question-image');
 
 // --- Helper Functions ---
 function initializeStudentIdentifier() {
@@ -543,20 +540,6 @@ function loadQuestion() {
         console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
         return;
     }
-
-    if (questionImage) { // Check if the element exists
-    if (currentQuestionDetails.image_url) {
-        // --- CHANGED: Construct the full URL ---
-        const fullImageUrl = GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url;
-        console.log("DEBUG loadQuestion: Setting image src to:", fullImageUrl);
-        questionImage.src = fullImageUrl;
-        questionImage.classList.remove('hidden');
-    } else {
-        questionImage.classList.add('hidden');
-        questionImage.src = ''; // Clear src to prevent showing old image
-    }
-}
-
     
     const currentModuleInfo = getCurrentModule();
     const currentQuestionDetails = getCurrentQuestionData();
