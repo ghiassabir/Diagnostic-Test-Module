@@ -75,8 +75,6 @@ let globalQuizSource = null;
 const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwneCF0xq9X-F-9AIxAiHpYFmRTErCzCPXlsWRloLRDWBGqwLEZC4NldCCAuND0jxUL/exec';
 const SESSION_STORAGE_KEY = 'bluebookQuizSession';
 
-const DIAGNOSTIC_STATE_KEY = 'diagnosticTestState'; 
-
 const fullTestDefinitions = {
     "DT-T0": {
         flow: ["DT-T0-RW-M1", "DT-T0-RW-M2", "DT-T0-MT-M1", "DT-T0-MT-M2"],
@@ -126,148 +124,6 @@ async function loadQuizData(quizName) {
         return false;
     }
 }
-
-// REPLACE your existing startAppOrQuiz function with this corrected version
-
-async function startAppOrQuiz() {
-    console.log("DEBUG startAppOrQuiz: Starting application logic.");
-
-    // IMPORTANT: Read URL parameters INSIDE this function, every time it's called.
-    const urlParams = new URLSearchParams(window.location.search);
-    const quizNameFromUrl = urlParams.get('quiz_name');
-    const testIdFromUrl = urlParams.get('test_id');
-    
-    // Set globals from these locally read params
-    globalOriginPageId = urlParams.get('originPageId'); 
-    globalQuizSource = urlParams.get('source');
-    if (globalQuizSource) console.log(`DEBUG startAppOrQuiz: Source is '${globalQuizSource}'`);
-
-    const savedSessionJSON = localStorage.getItem(SESSION_STORAGE_KEY);
-    let sessionResumed = false;
-
-    if (savedSessionJSON) {
-        console.log("DEBUG startAppOrQuiz: Found saved session data.");
-        try {
-            const savedSession = JSON.parse(savedSessionJSON);
-            if (savedSession && typeof savedSession.currentModuleIndex === 'number' && savedSession.currentTestFlow && savedSession.currentTestFlow.length > 0) {
-                const resumeConfirmation = confirm("An unfinished session was found. Would you like to resume it?");
-                if (resumeConfirmation) {
-                    console.log("DEBUG startAppOrQuiz: User chose to RESUME session.");
-                    sessionResumed = true;
-                    // (The rest of your existing, working session resume logic goes here)
-                    // It should restore all state variables, load data, start timers, and show the view.
-                    // This part seems to have been working correctly before, so no changes needed inside this block.
-                    // ...
-                } else {
-                    console.log("DEBUG startAppOrQuiz: User chose NOT to resume.");
-                    clearSessionState();
-                }
-            } else {
-                console.warn("DEBUG startAppOrQuiz: Saved session data is invalid.");
-                clearSessionState();
-            }
-        } catch (e) {
-            console.error("DEBUG startAppOrQuiz: Error parsing saved session.", e);
-            clearSessionState();
-        }
-    }
-
-    if (!sessionResumed) {
-        console.log("DEBUG startAppOrQuiz: No session resumed. Checking URL params for new session.");
-        
-        // This is the critical logic that will now work correctly
-        if (testIdFromUrl) {
-            console.log(`DEBUG startAppOrQuiz: Launching NEW full test from URL: ${testIdFromUrl}`);
-            // (Your existing logic to start a full test)
-            // ...
-            showView('test-interface-view');
-
-        } else if (quizNameFromUrl) {
-            console.log(`DEBUG startAppOrQuiz: Launching NEW single quiz from URL: ${quizNameFromUrl}`);
-            // (Your existing logic to start a single quiz)
-            currentInteractionMode = 'single_quiz';
-            currentTestFlow = [quizNameFromUrl];
-            // ... reset states ...
-            const success = await loadQuizData(quizNameFromUrl);
-            if (success) {
-                startPracticeQuizTimer();
-                populateQNavGrid();
-                showView('test-interface-view');
-            } else {
-                alert(`Could not load quiz: ${quizNameFromUrl}.`);
-                showView('home-view');
-            }
-
-        } else {
-            console.log("DEBUG startAppOrQuiz: No launch parameters. Displaying home screen.");
-            showView('home-view');
-        }
-    }
-}
-
-/*
-// ADD THIS NEW FUNCTION
-async function startAppOrQuiz() {
-    console.log("DEBUG startAppOrQuiz: Starting application logic.");
-    // This function contains the logic that was previously in DOMContentLoaded
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const quizNameFromUrl = urlParams.get('quiz_name');
-    const testIdFromUrl = urlParams.get('test_id');
-
-    // globalOriginPageId and globalQuizSource are already set by DOMContentLoaded, so we can use them here.
-
-    const savedSessionJSON = localStorage.getItem(SESSION_STORAGE_KEY);
-    let sessionResumed = false;
-
-    if (savedSessionJSON) {
-        // ... (The entire session resume logic from your working script) ...
-        // This includes parsing, validating, the confirm() prompt, and restoring state.
-        // It should end with `sessionResumed = true;` on success.
-        console.log("DEBUG startAppOrQuiz: Found saved session data.");
-        try {
-            const savedSession = JSON.parse(savedSessionJSON);
-            if (savedSession && typeof savedSession.currentModuleIndex === 'number' && savedSession.currentTestFlow) {
-                const resumeConfirmation = confirm("An unfinished session was found. Would you like to resume it?");
-                if (resumeConfirmation) {
-                    sessionResumed = true;
-                    // ... (Restore all state variables like currentInteractionMode, currentTestFlow, etc.)
-                    currentInteractionMode = savedSession.currentInteractionMode || 'full_test';
-                    currentTestFlow = savedSession.currentTestFlow;
-                    // ... and so on for all state variables.
-                    
-                    const quizNameToLoadForResume = savedSession.currentTestFlow[savedSession.currentModuleIndex];
-                    const success = await loadQuizData(quizNameToLoadForResume);
-                    if (success) {
-                        // ... (Restore timers and showView('test-interface-view'))
-                    } else {
-                        sessionResumed = false; clearSessionState();
-                    }
-                } else {
-                    clearSessionState();
-                }
-            } else {
-                clearSessionState();
-            }
-        } catch (e) {
-            clearSessionState();
-        }
-    }
-
-    if (!sessionResumed) {
-        console.log("DEBUG startAppOrQuiz: No session resumed. Checking URL params for new session.");
-        // This is the logic for starting a NEW session
-        if (testIdFromUrl) {
-            // ... (Your existing logic to start a full test) ...
-        } else if (quizNameFromUrl) {
-            // ... (Your existing logic to start a single quiz) ...
-        } else {
-            // ... (Your existing logic to show the fallback home-view) ...
-        }
-    }
-}
-*/
-
 
 // --- DOM Elements ---
 const allAppViews = document.querySelectorAll('.app-view');
@@ -949,131 +805,6 @@ if(sprInputFieldMain) {
     });
 }
 
-// REPLACE your entire submitCurrentModuleData function with this one to fix the SyntaxError
-
-async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = false) {
-    console.log(`DEBUG submitCurrentModuleData: Attempting to submit data for module index: ${moduleIndexToSubmit}. Is final: ${isFinalSubmission}`);
-    
-    // Ensure last question's time is recorded before submission
-    if (moduleIndexToSubmit === currentModuleIndex) {
-        recordTimeOnCurrentQuestion(); 
-    }
-
-    const submissions = [];
-    const timestamp = new Date().toISOString();
-    const quizNameForSubmission = (currentTestFlow && currentTestFlow[moduleIndexToSubmit]) ? currentTestFlow[moduleIndexToSubmit] : "UNKNOWN_MODULE_NAME";
-
-    if (!quizNameForSubmission || quizNameForSubmission === "UNKNOWN_MODULE_NAME") {
-        console.error(`DEBUG submitCurrentModuleData: Could not determine quizName for module index ${moduleIndexToSubmit}. Aborting submission.`);
-        return false; 
-    }
-
-    // --- Part 1: Gather all submission data for the specified module ---
-    for (const key in userAnswers) {
-        if (userAnswers.hasOwnProperty(key)) {
-            const keyModuleIndex = parseInt(key.split('-')[0]);
-            
-            if (keyModuleIndex === moduleIndexToSubmit) {
-                const answerState = userAnswers[key];
-                
-                // Validate that we have the necessary data to submit
-                if (!answerState.q_id || answerState.q_id.endsWith('-tmp') || typeof answerState.correct_ans === 'undefined' || answerState.correct_ans === null || typeof answerState.question_type_from_json === 'undefined') {
-                    console.warn(`DEBUG submitCurrentModuleData: Data incomplete for answer key ${key}. Skipping this answer.`);
-                    continue; 
-                }
-
-                let studentAnswerForSubmission = "";
-                let isCorrect = false;
-
-                if (answerState.question_type_from_json === 'student_produced_response') {
-                    studentAnswerForSubmission = answerState.spr_answer || "NO_ANSWER";
-                    if (answerState.correct_ans && studentAnswerForSubmission !== "NO_ANSWER") {
-                        const correctSprAnswers = String(answerState.correct_ans).split('|').map(s => s.trim().toLowerCase());
-                        if (correctSprAnswers.includes(studentAnswerForSubmission.trim().toLowerCase())) {
-                            isCorrect = true;
-                        }
-                    }
-                } else { 
-                    studentAnswerForSubmission = answerState.selected || "NO_ANSWER"; 
-                    if (answerState.correct_ans && studentAnswerForSubmission !== "NO_ANSWER") {
-                        isCorrect = (String(studentAnswerForSubmission).trim().toLowerCase() === String(answerState.correct_ans).trim().toLowerCase());
-                    }
-                }
-                
-                submissions.push({
-                    timestamp: timestamp,
-                    student_gmail_id: studentEmailForSubmission, 
-                    quiz_name: quizNameForSubmission, 
-                    question_id: answerState.q_id, 
-                    student_answer: studentAnswerForSubmission,
-                    is_correct: isCorrect, 
-                    time_spent_seconds: parseFloat(answerState.timeSpent || 0).toFixed(2),
-                    selection_changes: answerState.selectionChanges || 0,
-                    source: globalQuizSource || '' 
-                });
-            }
-        }
-    }
-
-    // --- Part 2: Save Diagnostic Test completion status to localStorage ---
-    console.log(`SUBMIT_DEBUG: Checking if module '${quizNameForSubmission}' should be marked as complete.`);
-    if (quizNameForSubmission && quizNameForSubmission.startsWith("DT-T0-")) {
-        console.log(`SUBMIT_DEBUG: Condition MET. Attempting to update localStorage for key: '${DIAGNOSTIC_STATE_KEY}'`);
-        try {
-            const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
-            const state = stateJSON ? JSON.parse(stateJSON) : {};
-            const completionKey = quizNameForSubmission + '_completed';
-            state[completionKey] = true;
-            const newStateJSON = JSON.stringify(state);
-            localStorage.setItem(DIAGNOSTIC_STATE_KEY, newStateJSON);
-            console.log(`SUBMIT_DEBUG: VERIFIED - localStorage was updated successfully.`);
-        } catch (e) {
-            console.error("SUBMIT_DEBUG: CRITICAL ERROR updating diagnostic completion state in localStorage", e);
-        }
-    } else {
-        console.log(`SUBMIT_DEBUG: Condition NOT MET. Module name '${quizNameForSubmission}' does not start with 'DT-T0-'.`);
-    }
-
-    // --- Part 3: Send submission data to Apps Script ---
-    if (submissions.length === 0) {
-        console.log(`DEBUG submitCurrentModuleData: No answers recorded for module ${quizNameForSubmission}. Nothing to submit.`);
-        return true; 
-    }
-
-    console.log(`DEBUG submitCurrentModuleData: Submitting for module ${quizNameForSubmission}:`, submissions);
-
-    if (!APPS_SCRIPT_WEB_APP_URL || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
-        console.warn("APPS_SCRIPT_WEB_APP_URL not set or invalid. Submission will not proceed for module " + quizNameForSubmission);
-        alert("Submission URL not configured. Data for module " + quizNameForSubmission + " logged to console.");
-        return false; 
-    }
-
-    try {
-        fetch(APPS_SCRIPT_WEB_APP_URL, {
-            method: 'POST', 
-            mode: 'no-cors', 
-            cache: 'no-cache',
-            headers: {'Content-Type': 'text/plain'},
-            redirect: 'follow', 
-            body: JSON.stringify(submissions) 
-        })
-        .then(() => {
-            console.log(`DEBUG submitCurrentModuleData: Submission attempt finished for module ${quizNameForSubmission} (no-cors mode).`);
-        })
-        .catch((error) => {
-            console.error(`DEBUG submitCurrentModuleData: Error during fetch for module ${quizNameForSubmission}:`, error);
-        });
-        return true; 
-    } catch (error) { 
-        console.error('DEBUG submitCurrentModuleData: Synchronous error setting up fetch for module ' + quizNameForSubmission + ':', error);
-        return false;
-    }
-}
-    
-
-
-
-/*
 async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = false) {
     console.log(`DEBUG submitCurrentModuleData: Attempting to submit data for module index: ${moduleIndexToSubmit}. Is final: ${isFinalSubmission}`);
     if (moduleIndexToSubmit === currentModuleIndex) {
@@ -1131,56 +862,7 @@ async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = 
         return true;
     }
     console.log(`DEBUG submitCurrentModuleData: Submitting for module ${quizNameForSubmission}:`, submissions);
-    // CHANGED: ADD this block to save completion state
-    
-    // If submission is successful (or even if it just finishes attempt), mark module as completed.
-    //if (globalQuizSource === 'diagnostic') {
-     const quizNameForCompletionCheck = currentTestFlow[moduleIndexToSubmit];
-
-     // --- START NEW DEBUGGING BLOCK ---
-    console.log(`SUBMIT_DEBUG: Checking if module '${quizNameForCompletionCheck}' should be marked as complete.`);
-        
-    if (quizNameForCompletionCheck && quizNameForCompletionCheck.startsWith("DT-T0-")) {
-        console.log(`SUBMIT_DEBUG: Condition MET. Attempting to update localStorage for key: '${DIAGNOSTIC_STATE_KEY}'`);
-        try {
-            const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
-            console.log(`SUBMIT_DEBUG: Current diagnostic state from localStorage:`, stateJSON);
-            const state = stateJSON ? JSON.parse(stateJSON) : {};
-            
-            const completionKey = quizNameForCompletionCheck + '_completed';
-            state[completionKey] = true; 
-            
-            const newStateJSON = JSON.stringify(state);
-            localStorage.setItem(DIAGNOSTIC_STATE_KEY, newStateJSON);
-            
-            console.log(`SUBMIT_DEBUG: Successfully setItem in localStorage. New state should be:`, newStateJSON);
-
-             // Final check to see if it was written correctly
-            if (localStorage.getItem(DIAGNOSTIC_STATE_KEY) === newStateJSON) {
-                console.log(`SUBMIT_DEBUG: VERIFIED - localStorage was updated successfully.`);
-            } else {
-                console.error(`SUBMIT_DEBUG: VERIFICATION FAILED - localStorage was NOT updated as expected.`);
-            }
-
-        } catch (e) {
-            console.error("SUBMIT_DEBUG: CRITICAL ERROR updating diagnostic completion state in localStorage", e);
-        }
-    } else {
-         console.log(`SUBMIT_DEBUG: Condition NOT MET. Module name '${quizNameForCompletionCheck}' does not start with 'DT-T0-'.`);
-    }
-    // --- END NEW DEBUGGING BLOCK ---
-            
-            const completedQuizName = currentTestFlow[moduleIndexToSubmit]; // e.g., "DT-T0-RW-M1"
-            state[completedQuizName + '_completed'] = true;
-            localStorage.setItem(DIAGNOSTIC_STATE_KEY, JSON.stringify(state));
-            console.log(`DEBUG submitCurrentModuleData: Marked ${completedQuizName} as completed in localStorage.`);
-        } catch (e) {
-            console.error("Error updating diagnostic completion state in localStorage", e);
-        }
-    }
-    // END CHANGED
-    
-        if (APPS_SCRIPT_WEB_APP_URL === 'YOUR_CORRECT_BLUEBOOK_APPS_SCRIPT_URL_HERE' || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
+    if (APPS_SCRIPT_WEB_APP_URL === 'YOUR_CORRECT_BLUEBOOK_APPS_SCRIPT_URL_HERE' || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
         console.warn("APPS_SCRIPT_WEB_APP_URL not set or invalid. Submission will not proceed for module " + quizNameForSubmission);
         alert("Submission URL not configured. Data for module " + quizNameForSubmission + " logged to console.");
         return false;
@@ -1203,7 +885,7 @@ async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = 
         return false;
     }
 }
-*/
+
 // --- Navigation ---
 function updateNavigation() {
     console.log("DEBUG: updateNavigation CALLED. View:", currentView, "Q#:", currentQuestionNumber, "ModTimeUp:", currentModuleTimeUp, "Mode:", currentInteractionMode);
@@ -1389,9 +1071,7 @@ if(backBtnFooter) {
 if(returnToHomeBtn) {
     returnToHomeBtn.addEventListener('click', () => {
         console.log(`DEBUG returnToHomeBtn: Clicked. globalOriginPageId: '${globalOriginPageId}'`);
-        
         clearSessionState();
-        
         if (globalOriginPageId && globalOriginPageId.trim() !== "") {
             let returnUrl = "";
             if (window.location.pathname.includes("/quiz-player/")) {
@@ -1557,20 +1237,7 @@ if(exitExamConfirmBtn) {
 }
 
 if (submitEmailBtn) {
-    submitEmailBtn.addEventListener('click', async () => { 
-    if (studentEmailField && studentEmailField.value.trim() !== "" && studentEmailField.value.includes('@')) {
-            studentEmailForSubmission = studentEmailField.value.trim();
-            localStorage.setItem('bluebookStudentEmail', studentEmailForSubmission);
-            console.log(`DEBUG submitEmailBtn: Email submitted and saved: ${studentEmailForSubmission}`);
-            
-            // CHANGED: Call the main app logic function now that email is set
-            startAppOrQuiz();
-
-        } else {
-            alert("Please enter a valid email address.");
-        }
-        
-    });
+    submitEmailBtn.addEventListener('click', async () => { /* ... existing email logic ... */ });
 }
 
 // --- DOMContentLoaded ---
@@ -1584,7 +1251,6 @@ if (submitEmailBtn) {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("DEBUG DOMContentLoaded: Initializing application.");
     const emailIsValid = initializeStudentIdentifier();
-    
     const urlParams = new URLSearchParams(window.location.search);
     const quizNameFromUrl = urlParams.get('quiz_name');
     const testIdFromUrl = urlParams.get('test_id');
