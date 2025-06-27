@@ -807,6 +807,131 @@ if(sprInputFieldMain) {
     });
 }
 
+// REPLACE your entire submitCurrentModuleData function with this one to fix the SyntaxError
+
+async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = false) {
+    console.log(`DEBUG submitCurrentModuleData: Attempting to submit data for module index: ${moduleIndexToSubmit}. Is final: ${isFinalSubmission}`);
+    
+    // Ensure last question's time is recorded before submission
+    if (moduleIndexToSubmit === currentModuleIndex) {
+        recordTimeOnCurrentQuestion(); 
+    }
+
+    const submissions = [];
+    const timestamp = new Date().toISOString();
+    const quizNameForSubmission = (currentTestFlow && currentTestFlow[moduleIndexToSubmit]) ? currentTestFlow[moduleIndexToSubmit] : "UNKNOWN_MODULE_NAME";
+
+    if (!quizNameForSubmission || quizNameForSubmission === "UNKNOWN_MODULE_NAME") {
+        console.error(`DEBUG submitCurrentModuleData: Could not determine quizName for module index ${moduleIndexToSubmit}. Aborting submission.`);
+        return false; 
+    }
+
+    // --- Part 1: Gather all submission data for the specified module ---
+    for (const key in userAnswers) {
+        if (userAnswers.hasOwnProperty(key)) {
+            const keyModuleIndex = parseInt(key.split('-')[0]);
+            
+            if (keyModuleIndex === moduleIndexToSubmit) {
+                const answerState = userAnswers[key];
+                
+                // Validate that we have the necessary data to submit
+                if (!answerState.q_id || answerState.q_id.endsWith('-tmp') || typeof answerState.correct_ans === 'undefined' || answerState.correct_ans === null || typeof answerState.question_type_from_json === 'undefined') {
+                    console.warn(`DEBUG submitCurrentModuleData: Data incomplete for answer key ${key}. Skipping this answer.`);
+                    continue; 
+                }
+
+                let studentAnswerForSubmission = "";
+                let isCorrect = false;
+
+                if (answerState.question_type_from_json === 'student_produced_response') {
+                    studentAnswerForSubmission = answerState.spr_answer || "NO_ANSWER";
+                    if (answerState.correct_ans && studentAnswerForSubmission !== "NO_ANSWER") {
+                        const correctSprAnswers = String(answerState.correct_ans).split('|').map(s => s.trim().toLowerCase());
+                        if (correctSprAnswers.includes(studentAnswerForSubmission.trim().toLowerCase())) {
+                            isCorrect = true;
+                        }
+                    }
+                } else { 
+                    studentAnswerForSubmission = answerState.selected || "NO_ANSWER"; 
+                    if (answerState.correct_ans && studentAnswerForSubmission !== "NO_ANSWER") {
+                        isCorrect = (String(studentAnswerForSubmission).trim().toLowerCase() === String(answerState.correct_ans).trim().toLowerCase());
+                    }
+                }
+                
+                submissions.push({
+                    timestamp: timestamp,
+                    student_gmail_id: studentEmailForSubmission, 
+                    quiz_name: quizNameForSubmission, 
+                    question_id: answerState.q_id, 
+                    student_answer: studentAnswerForSubmission,
+                    is_correct: isCorrect, 
+                    time_spent_seconds: parseFloat(answerState.timeSpent || 0).toFixed(2),
+                    selection_changes: answerState.selectionChanges || 0,
+                    source: globalQuizSource || '' 
+                });
+            }
+        }
+    }
+
+    // --- Part 2: Save Diagnostic Test completion status to localStorage ---
+    console.log(`SUBMIT_DEBUG: Checking if module '${quizNameForSubmission}' should be marked as complete.`);
+    if (quizNameForSubmission && quizNameForSubmission.startsWith("DT-T0-")) {
+        console.log(`SUBMIT_DEBUG: Condition MET. Attempting to update localStorage for key: '${DIAGNOSTIC_STATE_KEY}'`);
+        try {
+            const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+            const state = stateJSON ? JSON.parse(stateJSON) : {};
+            const completionKey = quizNameForSubmission + '_completed';
+            state[completionKey] = true;
+            const newStateJSON = JSON.stringify(state);
+            localStorage.setItem(DIAGNOSTIC_STATE_KEY, newStateJSON);
+            console.log(`SUBMIT_DEBUG: VERIFIED - localStorage was updated successfully.`);
+        } catch (e) {
+            console.error("SUBMIT_DEBUG: CRITICAL ERROR updating diagnostic completion state in localStorage", e);
+        }
+    } else {
+        console.log(`SUBMIT_DEBUG: Condition NOT MET. Module name '${quizNameForSubmission}' does not start with 'DT-T0-'.`);
+    }
+
+    // --- Part 3: Send submission data to Apps Script ---
+    if (submissions.length === 0) {
+        console.log(`DEBUG submitCurrentModuleData: No answers recorded for module ${quizNameForSubmission}. Nothing to submit.`);
+        return true; 
+    }
+
+    console.log(`DEBUG submitCurrentModuleData: Submitting for module ${quizNameForSubmission}:`, submissions);
+
+    if (!APPS_SCRIPT_WEB_APP_URL || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
+        console.warn("APPS_SCRIPT_WEB_APP_URL not set or invalid. Submission will not proceed for module " + quizNameForSubmission);
+        alert("Submission URL not configured. Data for module " + quizNameForSubmission + " logged to console.");
+        return false; 
+    }
+
+    try {
+        fetch(APPS_SCRIPT_WEB_APP_URL, {
+            method: 'POST', 
+            mode: 'no-cors', 
+            cache: 'no-cache',
+            headers: {'Content-Type': 'text/plain'},
+            redirect: 'follow', 
+            body: JSON.stringify(submissions) 
+        })
+        .then(() => {
+            console.log(`DEBUG submitCurrentModuleData: Submission attempt finished for module ${quizNameForSubmission} (no-cors mode).`);
+        })
+        .catch((error) => {
+            console.error(`DEBUG submitCurrentModuleData: Error during fetch for module ${quizNameForSubmission}:`, error);
+        });
+        return true; 
+    } catch (error) { 
+        console.error('DEBUG submitCurrentModuleData: Synchronous error setting up fetch for module ' + quizNameForSubmission + ':', error);
+        return false;
+    }
+}
+    
+
+
+
+/*
 async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = false) {
     console.log(`DEBUG submitCurrentModuleData: Attempting to submit data for module index: ${moduleIndexToSubmit}. Is final: ${isFinalSubmission}`);
     if (moduleIndexToSubmit === currentModuleIndex) {
@@ -936,7 +1061,7 @@ async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = 
         return false;
     }
 }
-
+*/
 // --- Navigation ---
 function updateNavigation() {
     console.log("DEBUG: updateNavigation CALLED. View:", currentView, "Q#:", currentQuestionNumber, "ModTimeUp:", currentModuleTimeUp, "Mode:", currentInteractionMode);
