@@ -201,6 +201,8 @@ const continueAfterBreakBtn = document.getElementById('continue-after-break-btn'
 const emailInputViewEl = document.getElementById('email-input-view');
 const studentEmailField = document.getElementById('student-email-field');
 const submitEmailBtn = document.getElementById('submit-email-btn');
+const passageImageEl = document.getElementById('passage-image'); 
+const questionImageEl = document.getElementById('question-image');
 
 // --- Helper Functions ---
 function initializeStudentIdentifier() {
@@ -579,6 +581,7 @@ function loadQuestion() {
     if(mainContentAreaDynamic) mainContentAreaDynamic.classList.toggle('cross-out-active', isCrossOutToolActive && currentQuestionDetails.question_type !== 'student_produced_response');
     if(crossOutToolBtnMain) crossOutToolBtnMain.classList.toggle('active', isCrossOutToolActive && currentQuestionDetails.question_type !== 'student_produced_response');
 
+    // START OF PANE RESET BLOCK
     passagePane.style.display = 'none';
     if (passageContentEl) passageContentEl.innerHTML = '';
     sprInstructionsPane.style.display = 'none';
@@ -602,9 +605,12 @@ function loadQuestion() {
         }
 
         const imageUrl = currentQuestionDetails.image_url;
-        if (imageUrl && imageUrl.trim() !== "") {
-            console.log(`DEBUG loadQuestion: Found image_url: ${imageUrl}`);
-            // This URL assumes your images are in a specific folder. Adjust if necessary.
+      //  if (imageUrl && imageUrl.trim() !== "") {
+        //    console.log(`DEBUG loadQuestion: Found image_url: ${imageUrl}`);
+             if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
+        console.log(`DEBUG loadQuestion: Found image_url: ${imageUrl}`);   
+    
+        // This URL assumes your images are in a specific folder. Adjust if necessary.
             const fullImageUrl = `https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/${imageUrl}`;
             console.log(`DEBUG loadQuestion: Constructed full image URL: ${fullImageUrl}`);
             
