@@ -306,11 +306,18 @@
 
             function launchQuizModule(quizName) {
                 const originPageId = 'index'; // This file's name without extension
-                const url = `${QUIZ_PLAYER_PATH}?test_id=DT-T0&start_module=${quizName}&originPageId=${originPageId}&source=diagnostic`;
+                //const url = `${QUIZ_PLAYER_PATH}?test_id=DT-T0&start_module=${quizName}&originPageId=${originPageId}&source=diagnostic`;
                 // Note: We use test_id=DT-T0 to tell quiz.html it's a test flow,
                 // and start_module can optionally tell it which module to jump to if needed,
                 // although the main logic relies on module completion state.
                 // A simpler URL could be just quiz_name=quizName, but using test_id makes it clear it's part of a larger test.
+                
+                // --- CHANGED: Use 'quiz_name' parameter instead of 'test_id' ---
+    // This tells quiz.html to run in 'single_quiz' mode for just this module.
+    // The logic for what happens *after* is handled by this index.html page.
+    const url = `${QUIZ_PLAYER_PATH}?quiz_name=${quizName}&originPageId=${originPageId}&source=diagnostic`;
+
+                
                 console.log(`Launching quiz player with URL: ${url}`);
                 window.location.href = url;
             }
