@@ -202,6 +202,8 @@ const continueAfterBreakBtn = document.getElementById('continue-after-break-btn'
 const emailInputViewEl = document.getElementById('email-input-view');
 const studentEmailField = document.getElementById('student-email-field');
 const submitEmailBtn = document.getElementById('submit-email-btn');
+// CHANGED: Added missing DOM element definition
+const questionImage = document.getElementById('question-image');
 
 // --- Helper Functions ---
 function initializeStudentIdentifier() {
