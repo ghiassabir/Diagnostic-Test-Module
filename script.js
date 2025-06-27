@@ -869,10 +869,40 @@ async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = 
     // If submission is successful (or even if it just finishes attempt), mark module as completed.
     //if (globalQuizSource === 'diagnostic') {
      const quizNameForCompletionCheck = currentTestFlow[moduleIndexToSubmit];
+
+     // --- START NEW DEBUGGING BLOCK ---
+    console.log(`SUBMIT_DEBUG: Checking if module '${quizNameForCompletionCheck}' should be marked as complete.`);
+        
     if (quizNameForCompletionCheck && quizNameForCompletionCheck.startsWith("DT-T0-")) {
+        console.log(`SUBMIT_DEBUG: Condition MET. Attempting to update localStorage for key: '${DIAGNOSTIC_STATE_KEY}'`);
         try {
             const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+            console.log(`SUBMIT_DEBUG: Current diagnostic state from localStorage:`, stateJSON);
             const state = stateJSON ? JSON.parse(stateJSON) : {};
+            
+            const completionKey = quizNameForCompletionCheck + '_completed';
+            state[completionKey] = true; 
+            
+            const newStateJSON = JSON.stringify(state);
+            localStorage.setItem(DIAGNOSTIC_STATE_KEY, newStateJSON);
+            
+            console.log(`SUBMIT_DEBUG: Successfully setItem in localStorage. New state should be:`, newStateJSON);
+
+             // Final check to see if it was written correctly
+            if (localStorage.getItem(DIAGNOSTIC_STATE_KEY) === newStateJSON) {
+                console.log(`SUBMIT_DEBUG: VERIFIED - localStorage was updated successfully.`);
+            } else {
+                console.error(`SUBMIT_DEBUG: VERIFICATION FAILED - localStorage was NOT updated as expected.`);
+            }
+
+        } catch (e) {
+            console.error("SUBMIT_DEBUG: CRITICAL ERROR updating diagnostic completion state in localStorage", e);
+        }
+    } else {
+         console.log(`SUBMIT_DEBUG: Condition NOT MET. Module name '${quizNameForCompletionCheck}' does not start with 'DT-T0-'.`);
+    }
+    // --- END NEW DEBUGGING BLOCK ---
+            
             const completedQuizName = currentTestFlow[moduleIndexToSubmit]; // e.g., "DT-T0-RW-M1"
             state[completedQuizName + '_completed'] = true;
             localStorage.setItem(DIAGNOSTIC_STATE_KEY, JSON.stringify(state));
