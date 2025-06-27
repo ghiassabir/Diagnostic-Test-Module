@@ -201,6 +201,8 @@ const continueAfterBreakBtn = document.getElementById('continue-after-break-btn'
 const emailInputViewEl = document.getElementById('email-input-view');
 const studentEmailField = document.getElementById('student-email-field');
 const submitEmailBtn = document.getElementById('submit-email-btn');
+const passageImageEl = document.getElementById('passage-image'); // ADD THIS
+const questionImageEl = document.getElementById('question-image'); // ADD THIS
 
 // --- Helper Functions ---
 function initializeStudentIdentifier() {
@@ -590,6 +592,42 @@ function loadQuestion() {
     answerOptionsMainEl.style.display = 'none';
     sprInputContainerMain.style.display = 'none';
 
+    // --- CHANGED: Added Image Handling Logic START ---
+    // Reset both image elements first
+    if (passageImageEl) {
+        passageImageEl.src = "";
+        passageImageEl.classList.add('hidden');
+    }
+    if (questionImageEl) {
+        questionImageEl.src = "";
+        questionImageEl.classList.add('hidden');
+    }
+
+    const imageUrl = currentQuestionDetails.image_url;
+    if (imageUrl && imageUrl.trim() !== "") {
+        console.log(`DEBUG loadQuestion: Found image_url: ${imageUrl}`);
+        const fullImageUrl = `https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/${imageUrl}`;
+        console.log(`DEBUG loadQuestion: Constructed full image URL: ${fullImageUrl}`);
+        
+        if (currentModuleInfo.type === 'RW') {
+            // For Reading & Writing, place image in the LEFT pane
+            if (passageImageEl) {
+                passageImageEl.src = fullImageUrl;
+                passageImageEl.classList.remove('hidden');
+                console.log(`DEBUG loadQuestion: Set image for R&W in passage-pane.`);
+            }
+        } else { // For Math and other types, place image in the RIGHT pane
+            if (questionImageEl) {
+                questionImageEl.src = fullImageUrl;
+                questionImageEl.classList.remove('hidden');
+                console.log(`DEBUG loadQuestion: Set image for Math in question-pane.`);
+            }
+        }
+    }
+    // --- CHANGED: Added Image Handling Logic END ---
+
+
+    
     const passageTextFromJson = currentQuestionDetails.passage_content;
     const stemTextFromJson = currentQuestionDetails.question_stem;
     console.log("DEBUG loadQuestion: passageTextFromJson:", passageTextFromJson ? passageTextFromJson.substring(0,30)+"..." : "null/empty");
