@@ -423,6 +423,37 @@
         .review-legend { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--bluebook-light-text); }
         .review-legend .legend-item { display: flex; align-items: center; gap: 0.25rem; }
         .review-q-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+    /* Image styles */
+    #passage-image {
+        /* Style for images in the left (passage) pane */
+        max-width: 100%; /* English images will take up to 100% of the passage pane width */
+        height: auto; 
+        display: block; /* Ensure it acts as a block element for margin:auto to work */
+        margin: 0 auto 1rem auto; /* Center it horizontally and add some space below */
+        border: 1px solid var(--bluebook-border-color); 
+        border-radius: 0.25rem;
+    }
+
+    #question-image {
+        /* Style for images in the right (question) pane - typically Math */
+        max-width: 80%; /* Math images constrained to 80% */
+        height: auto; 
+        display: block; /* Ensure it acts as a block element for margin:auto to work */
+        margin: 0 auto 1rem auto; /* Center it horizontally and add some space below */
+        border: 1px solid var(--bluebook-border-color); 
+        border-radius: 0.25rem;
+    }
+    
+    /* Ensure your .hidden class is correctly defined to apply display: none !important; */
+    .hidden {
+        display: none !important;
+    }
+
+        
+    
+    
+    
     </style>
     <!-- MathJax Configuration -->
     <script>
