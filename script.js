@@ -536,6 +536,183 @@ function showView(viewId) {
     updateNavigation();
 }
 
+// --- script.js ---
+
+// REPLACE your entire loadQuestion function with this corrected version
+
+function loadQuestion() {
+    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
+    
+    if (!testInterfaceViewEl.classList.contains('active')) {
+        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
+        return;
+    }
+    
+    // --- 1. COMPLETE RESET of all dynamic elements ---
+    mainContentAreaDynamic.classList.remove('single-pane');
+    
+    passagePane.style.display = 'none';
+    sprInstructionsPane.style.display = 'none';
+    paneDivider.style.display = 'none';
+    
+    if (passageImageEl) { passageImageEl.src = ''; passageImageEl.classList.add('hidden'); }
+    if (stemImageEl) { stemImageEl.src = ''; stemImageEl.classList.add('hidden'); }
+    
+    if (passageContentEl) passageContentEl.innerHTML = '';
+    if (sprInstructionsContent) sprInstructionsContent.innerHTML = '';
+    if (questionTextMainEl) questionTextMainEl.innerHTML = '';
+    if (answerOptionsMainEl) { answerOptionsMainEl.innerHTML = ''; answerOptionsMainEl.style.display = 'none'; }
+    if (sprInputContainerMain) sprInputContainerMain.style.display = 'none';
+
+    // --- 2. GET DATA ---
+    const currentModuleInfo = getCurrentModule(); 
+    const currentQuestionDetails = getCurrentQuestionData();
+
+    if (!currentModuleInfo || !currentQuestionDetails) {
+        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
+        updateNavigation();
+        return;
+    }
+    
+    const answerState = getAnswerState();
+    if (!answerState) { /* ... error handling ... */ return; }
+    questionStartTime = Date.now();
+
+    // --- 3. PREPARE DATA ---
+    const passageTextFromJson = currentQuestionDetails.passage_content;
+    const stemTextFromJson = currentQuestionDetails.question_stem;
+    let fullImageUrl = null;
+    if (currentQuestionDetails.image_url) {
+        fullImageUrl = GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url;
+    }
+
+    // --- (Header/Tool states remain the same) ---
+    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
+    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
+    // ... all other header/tool visibility logic ...
+
+    // --- 4. DETERMINE LAYOUT and 5. SET PANE VISIBILITY ---
+    let isTwoPane = false;
+    if (currentQuestionDetails.question_type === 'student_produced_response') {
+        isTwoPane = true;
+        sprInstructionsPane.style.display = 'flex';
+        paneDivider.style.display = 'block';
+    } else if (passageTextFromJson && passageTextFromJson.trim() !== "") {
+        isTwoPane = true;
+        passagePane.style.display = 'flex';
+        paneDivider.style.display = 'block';
+    } else {
+        isTwoPane = false;
+        mainContentAreaDynamic.classList.add('single-pane');
+    }
+
+    // --- 6. POPULATE CONTENT ---
+
+    // Populate Left Pane Content (if two-pane)
+    if (isTwoPane) {
+        if (currentQuestionDetails.question_type === 'student_produced_response') {
+            if (sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
+        } else { // It must be a passage-based MCQ
+            if (fullImageUrl && passageImageEl) {
+                passageImageEl.src = fullImageUrl;
+                passageImageEl.classList.remove('hidden');
+            }
+            if (passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
+        }
+    }
+
+    // Populate Right Pane Content
+    if (isTwoPane) { // For two-pane, stem image (if any) and stem text go in right pane
+        if (fullImageUrl && stemImageEl && passagePane.style.display === 'none') { // Only show stem image if not already shown in passage
+             stemImageEl.src = fullImageUrl;
+             stemImageEl.classList.remove('hidden');
+        }
+        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+
+    } else { // For single-pane, image (if any) and stem text go in right pane
+        if (fullImageUrl && stemImageEl) {
+            stemImageEl.src = fullImageUrl;
+            stemImageEl.classList.remove('hidden');
+        }
+        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+    }
+
+    // Populate Answer Area (Options or SPR Input)
+    if (currentQuestionDetails.question_type.includes('multiple_choice')) {
+        answerOptionsMainEl.style.display = 'flex';
+        const options = {};
+        // ... (populate options A,B,C,D,E from JSON)
+        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
+        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
+        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
+        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
+        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
+
+        for (const [key, value] of Object.entries(options)) {
+            // ... (your existing, correct option rendering code with selected, crossed-out states, etc.)
+            const isSelected = (answerState.selected === value);
+            const isCrossedOut = answerState.crossedOut.includes(key);
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'answer-option-container';
+            containerDiv.dataset.optionKey = key;
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'answer-option';
+            if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
+            if (isCrossedOut) optionDiv.classList.add('crossed-out');
+            const answerLetterDiv = document.createElement('div');
+            answerLetterDiv.className = 'answer-letter';
+            if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
+            answerLetterDiv.textContent = key;
+            const answerTextSpan = document.createElement('span');
+            answerTextSpan.className = 'answer-text';
+            if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
+            answerTextSpan.innerHTML = value; 
+            optionDiv.appendChild(answerLetterDiv);
+            optionDiv.appendChild(answerTextSpan);
+            containerDiv.appendChild(optionDiv);
+            if (isCrossOutToolActive && !isCrossedOut) {
+                const crossOutBtnIndividual = document.createElement('button');
+                crossOutBtnIndividual.className = 'individual-cross-out-btn';
+                crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+                crossOutBtnIndividual.title = `Cross out option ${key}`;
+                crossOutBtnIndividual.dataset.action = 'cross-out-individual';
+                containerDiv.appendChild(crossOutBtnIndividual);
+            } else if (isCrossedOut) {
+                const undoBtn = document.createElement('button');
+                undoBtn.className = 'undo-cross-out-btn';
+                undoBtn.textContent = 'Undo';
+                undoBtn.title = `Undo cross out for option ${key}`;
+                undoBtn.dataset.action = 'undo-cross-out';
+                containerDiv.appendChild(undoBtn);
+            }
+            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
+        }
+    } else if (currentQuestionDetails.question_type === 'student_produced_response') {
+        sprInputContainerMain.style.display = 'block';
+        if (sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
+        if (sprAnswerPreviewMain) sprAnswerPreviewMain.textContent = `Answer Preview: ${answerState.spr_answer || ''}`;
+    }
+
+    // --- 7. FINALIZE ---
+    if (typeof MathJax !== "undefined") {
+        if (MathJax.typesetPromise) {
+            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                .catch(err => console.error('MathJax Typesetting Error:', err));
+        } else if (MathJax.startup && MathJax.startup.promise) {
+            MathJax.startup.promise.then(() => {
+                if (MathJax.typesetPromise) {
+                     MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                        .catch(err => console.error('MathJax Typesetting Error (after startup.promise):', err));
+                }
+            }).catch(err => console.error("Error waiting for MathJax startup:", err));
+        }
+    }
+    updateNavigation();
+}
+
+
+/*
 // REPLACE your entire loadQuestion function with this one:
 function loadQuestion() {
     console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
@@ -725,8 +902,7 @@ function loadQuestion() {
     }
    updateNavigation();
 }
-
-
+*/
 
 
 /*
