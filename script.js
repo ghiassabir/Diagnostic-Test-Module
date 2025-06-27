@@ -867,7 +867,9 @@ async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = 
     // CHANGED: ADD this block to save completion state
     
     // If submission is successful (or even if it just finishes attempt), mark module as completed.
-    if (globalQuizSource === 'diagnostic') {
+    //if (globalQuizSource === 'diagnostic') {
+     const quizNameForCompletionCheck = currentTestFlow[moduleIndexToSubmit];
+    if (quizNameForCompletionCheck && quizNameForCompletionCheck.startsWith("DT-T0-")) {
         try {
             const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
             const state = stateJSON ? JSON.parse(stateJSON) : {};
