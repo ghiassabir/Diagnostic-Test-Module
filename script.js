@@ -311,15 +311,9 @@ function startModuleTimer(durationSeconds) {
             currentModuleTimeLeft = 0;
             currentModuleTimeUp = true;
             updateModuleTimerDisplay(currentModuleTimeLeft);
-            
             const completedModuleIndexForTimer = currentModuleIndex;
-            //const completedQuizNameForTimer = currentTestFlow[completedModuleIndexForTimer];
-            console.log(`Module time is up for ${completedQuizNameForTimer}!`);
-            
             recordTimeOnCurrentQuestion();
-            
-            //submitCurrentModuleData(completedModuleIndexForTimer, (completedModuleIndexForTimer === currentTestFlow.length - 1 && currentInteractionMode === 'full_test'));
-            
+            submitCurrentModuleData(completedModuleIndexForTimer, (completedModuleIndexForTimer === currentTestFlow.length - 1 && currentInteractionMode === 'full_test'));
             alert("Time for this module is up! You will be taken to the review page.");
             if (currentView !== 'review-page-view') {
                 showView('review-page-view');
