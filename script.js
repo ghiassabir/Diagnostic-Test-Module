@@ -997,6 +997,98 @@ function updateNavigation() {
     }
 }
 
+// --- script.js (Fix for Email Input Screen) ---
+
+// ADD THIS ENTIRE BLOCK to your script.js, with the other event listeners.
+
+if (submitEmailBtn) {
+    submitEmailBtn.addEventListener('click', async () => { 
+        if (studentEmailField && studentEmailField.value.trim() !== "" && studentEmailField.value.includes('@')) {
+            studentEmailForSubmission = studentEmailField.value.trim();
+            localStorage.setItem('bluebookStudentEmail', studentEmailForSubmission); // Save for future sessions
+            console.log(`DEBUG submitEmailBtn: Email submitted: ${studentEmailForSubmission}, saved.`);
+            
+            // Now that we have the email, re-run the logic to check URL params and start the test/quiz
+            const urlParams = new URLSearchParams(window.location.search);
+            const quizNameFromUrl = urlParams.get('quiz_name');
+            const testIdFromUrl = urlParams.get('test_id'); 
+            
+            console.log(`DEBUG submitEmailBtn: After email submission, checking launch params. quizName: ${quizNameFromUrl}, testId: ${testIdFromUrl}`);
+
+            if (testIdFromUrl) { 
+                console.log(`DEBUG submitEmailBtn: Launching full test '${testIdFromUrl}' after email.`);
+                if (fullTestDefinitions[testIdFromUrl]) {
+                    currentInteractionMode = 'full_test';
+                    currentTestFlow = fullTestDefinitions[testIdFromUrl].flow;
+                    
+                    // Reset all necessary states for a new test
+                    currentModuleIndex = 0; currentQuestionNumber = 1; userAnswers = {};
+                    isTimerHidden = false; isCrossOutToolActive = false; isHighlightingActive = false;
+                    currentModuleTimeUp = false; questionStartTime = 0;
+
+                    if (currentTestFlow && currentTestFlow.length > 0) {
+                        const firstQuizName = currentTestFlow[currentModuleIndex];
+                        const moduleInfo = moduleMetadata[firstQuizName];
+                        let jsonToLoad = firstQuizName; 
+                        
+                        const success = await loadQuizData(jsonToLoad);
+                        if (success && currentQuizQuestions.length > 0) {
+                            // Check for DT-T0 untimed logic
+                            const isDtT0Module = firstQuizName.startsWith("DT-T0-");
+                            if (isDtT0Module) {
+                                startPracticeQuizTimer(); 
+                                currentModuleTimeUp = true; // Allows immediate progression
+                            } else if (moduleInfo && typeof moduleInfo.durationSeconds === 'number' && moduleInfo.durationSeconds > 0) { 
+                                startModuleTimer(moduleInfo.durationSeconds); 
+                            } else { 
+                                updateModuleTimerDisplay(0); 
+                                currentModuleTimeUp = true;
+                            }
+                            populateQNavGrid(); 
+                            showView('test-interface-view');
+                        } else { 
+                            alert(`Could not load initial module for test: ${testIdFromUrl}.`); 
+                            showView('home-view'); 
+                        }
+                    } else { 
+                        alert(`Test ID '${testIdFromUrl}' has no defined flow.`); 
+                        showView('home-view');
+                    }
+                } else { 
+                    alert(`Unknown Test ID: ${testIdFromUrl}.`); 
+                    showView('home-view'); 
+                }
+            } else if (quizNameFromUrl) {
+                console.log(`DEBUG submitEmailBtn: Launching single quiz '${quizNameFromUrl}' after email.`);
+                currentInteractionMode = 'single_quiz';
+                currentTestFlow = [quizNameFromUrl];
+                
+                // Reset states for new quiz
+                currentModuleIndex = 0; currentQuestionNumber = 1; userAnswers = {};
+                isTimerHidden = false; isCrossOutToolActive = false; isHighlightingActive = false;
+                currentModuleTimeUp = false; questionStartTime = 0;
+
+                const success = await loadQuizData(quizNameFromUrl);
+                if (success && currentQuizQuestions.length > 0) {
+                    startPracticeQuizTimer(); 
+                    populateQNavGrid(); 
+                    showView('test-interface-view');
+                } else { 
+                    alert(`Could not load quiz: ${quizNameFromUrl}.`); 
+                    showView('home-view'); 
+                }
+            } else {
+                // If there are no URL params, just show the informational home view
+                console.log("DEBUG submitEmailBtn: No quiz/test in URL. Showing home view.");
+                showView('home-view');
+            }
+        } else {
+            alert("Please enter a valid email address.");
+        }
+    });
+}
+
+
 function nextButtonClickHandler() {
     if (currentView !== 'test-interface-view') return;
     console.log("DEBUG: nextButtonClickHandler CALLED");
