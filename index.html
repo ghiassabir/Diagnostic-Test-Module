@@ -85,13 +85,27 @@
                 const state = getDiagnosticState();
                 
                 // Helper to manage button state
-                const setButtonState = (button, stateClass, link) => {
-                    button.className = 'module-button'; // Reset classes
-                    button.classList.add(stateClass);
-                    if (stateClass !== 'active') {
-                        button.href = '#'; // Disable link if not active
-                    } else {
-                        button.href = link; // Restore original link if active
+               // const setButtonState = (button, stateClass, link) => {
+                 //   button.className = 'module-button'; // Reset classes
+                  //  button.classList.add(stateClass);
+                  //  if (stateClass !== 'active') {
+                  //      button.href = '#'; // Disable link if not active
+                  //  } else {
+                   //     button.href = link; // Restore original link if active
+                const setButtonState = (button, isActive, isCompleted, link) => {
+        // Reset all state-based classes first
+        button.classList.remove('active', 'completed', 'disabled');
+        button.href = '#'; // Default to disabled link
+
+        if (isCompleted) {
+            button.classList.add('completed');
+        } else if (isActive) {
+            button.classList.add('active');
+            button.href = link; // Only active buttons get a real link
+        } else {
+            button.classList.add('disabled');
+
+                
                     }
                 };
                 
@@ -104,6 +118,14 @@
                 };
 
                 // Determine state for each button
+                 setButtonState(buttons.m1, !state.DT_T0_RW_M1_completed, state.DT_T0_RW_M1_completed, originalLinks.m1);
+                setButtonState(buttons.m2, state.DT_T0_RW_M1_completed && !state.DT_T0_RW_M2_completed, state.DT_T0_RW_M2_completed, originalLinks.m2);
+                 setButtonState(buttons.m3, state.DT_T0_RW_M2_completed && !state.DT_T0_MT_M1_completed, state.DT_T0_MT_M1_completed, originalLinks.m3);
+                setButtonState(buttons.m4, state.DT_T0_MT_M1_completed && !state.DT_T0_MT_M2_completed, state.DT_T0_MT_M2_completed, originalLinks.m4);
+                
+
+                
+                /*
                 // Module 1
                 setButtonState(buttons.m1, state.DT_T0_RW_M1_completed ? 'completed' : 'active', originalLinks.m1);
 
@@ -121,9 +143,13 @@
                 if (state.DT_T0_MT_M2_completed) setButtonState(buttons.m4, 'completed', originalLinks.m4);
                 else if (state.DT_T0_MT_M1_completed) setButtonState(buttons.m4, 'active', originalLinks.m4);
                 else setButtonState(buttons.m4, 'disabled', originalLinks.m4);
+               */
 
+
+                
                 // Results Button
                 buttons.results.classList.remove('active', 'disabled'); // Reset results button classes
+                buttons.results.classList.add('results-button'); // Base class
                 if (state.DT_T0_MT_M2_completed) {
                     buttons.results.classList.add('results-button', 'active');
                     buttons.results.href = originalLinks.results;
