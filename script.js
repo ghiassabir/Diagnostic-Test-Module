@@ -536,8 +536,177 @@ function showView(viewId) {
     updateNavigation();
 }
 
-// --- script.js ---
 
+// REPLACE your entire existing loadQuestion function with this corrected version:
+
+function loadQuestion() {
+    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
+    
+    if (!testInterfaceViewEl.classList.contains('active')) {
+        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
+        return;
+    }
+    
+    // --- 1. COMPLETE RESET of all dynamic elements ---
+    mainContentAreaDynamic.classList.remove('single-pane');
+    passagePane.style.display = 'none';
+    sprInstructionsPane.style.display = 'none';
+    paneDivider.style.display = 'none';
+    if (passageImageEl) { passageImageEl.src = ''; passageImageEl.classList.add('hidden'); }
+    if (stemImageEl) { stemImageEl.src = ''; stemImageEl.classList.add('hidden'); }
+    if (passageContentEl) passageContentEl.innerHTML = '';
+    if (sprInstructionsContent) sprInstructionsContent.innerHTML = '';
+    if (questionTextMainEl) questionTextMainEl.innerHTML = '';
+    if (answerOptionsMainEl) { answerOptionsMainEl.innerHTML = ''; answerOptionsMainEl.style.display = 'none'; }
+    if (sprInputContainerMain) sprInputContainerMain.style.display = 'none';
+
+    // --- 2. GET DATA ---
+    const currentModuleInfo = getCurrentModule(); 
+    const currentQuestionDetails = getCurrentQuestionData();
+
+    if (!currentModuleInfo || !currentQuestionDetails) {
+        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
+        updateNavigation();
+        return;
+    }
+    
+    const answerState = getAnswerState();
+    if (!answerState) {
+        console.error("CRITICAL: answerState is null in loadQuestion. This should not happen.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Internal state error.</p>";
+        updateNavigation();
+        return;
+    }
+    questionStartTime = Date.now();
+
+    // --- 3. PREPARE DATA & HEADER ---
+    const passageTextFromJson = currentQuestionDetails.passage_content;
+    const stemTextFromJson = currentQuestionDetails.question_stem;
+    let fullImageUrl = currentQuestionDetails.image_url ? GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url : null;
+    
+    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
+    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
+    
+    const isMathTypeModule = currentModuleInfo.type === "Math";
+    if(highlightsNotesBtn) highlightsNotesBtn.classList.toggle('hidden', isMathTypeModule);
+    if(calculatorBtnHeader) calculatorBtnHeader.classList.toggle('hidden', !isMathTypeModule);
+    if(referenceBtnHeader) referenceBtnHeader.classList.toggle('hidden', !isMathTypeModule);
+
+    // --- 4. DETERMINE LAYOUT & POPULATE ---
+    if (currentQuestionDetails.question_type === 'student_produced_response') {
+        // --- LAYOUT: Two-Pane (SPR Instructions | Stem & Input) ---
+        sprInstructionsPane.style.display = 'flex';
+        paneDivider.style.display = 'block';
+
+        // Populate Left Pane (SPR Instructions)
+        if (sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
+        
+        // Populate Right Pane (Image, Stem, Input)
+        if (fullImageUrl && stemImageEl) {
+            stemImageEl.src = fullImageUrl;
+            stemImageEl.classList.remove('hidden');
+        }
+        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+        sprInputContainerMain.style.display = 'block';
+        if (sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
+        if (sprAnswerPreviewMain) sprAnswerPreviewMain.textContent = `Answer Preview: ${answerState.spr_answer || ''}`;
+        
+    } else if (currentQuestionDetails.question_type.includes('multiple_choice')) {
+        
+        if (passageTextFromJson && passageTextFromJson.trim() !== "") {
+            // --- LAYOUT: Two-Pane (Image & Passage | Stem & Options) ---
+            passagePane.style.display = 'flex';
+            paneDivider.style.display = 'block';
+
+            // Populate Left Pane
+            if (fullImageUrl && passageImageEl) {
+                passageImageEl.src = fullImageUrl;
+                passageImageEl.classList.remove('hidden');
+            }
+            if (passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
+
+            // Populate Right Pane
+            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+            
+        } else {
+            // --- LAYOUT: Single-Pane (Image, Stem, & Options) ---
+            mainContentAreaDynamic.classList.add('single-pane');
+
+            // Populate Right (Single) Pane
+            if (fullImageUrl && stemImageEl) {
+                stemImageEl.src = fullImageUrl;
+                stemImageEl.classList.remove('hidden');
+            }
+            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+        }
+
+        // Populate Answer Area (MCQ Options) for both MCQ layouts
+        answerOptionsMainEl.style.display = 'flex';
+        const options = {};
+        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
+        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
+        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
+        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
+        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
+
+        for (const [key, value] of Object.entries(options)) {
+            const isSelected = (answerState.selected === value);
+            const isCrossedOut = answerState.crossedOut.includes(key);
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'answer-option-container';
+            containerDiv.dataset.optionKey = key;
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'answer-option';
+            if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
+            if (isCrossedOut) optionDiv.classList.add('crossed-out');
+            const answerLetterDiv = document.createElement('div');
+            answerLetterDiv.className = 'answer-letter';
+            if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
+            answerLetterDiv.textContent = key;
+            const answerTextSpan = document.createElement('span');
+            answerTextSpan.className = 'answer-text';
+            if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
+            answerTextSpan.innerHTML = value; 
+            optionDiv.appendChild(answerLetterDiv);
+            optionDiv.appendChild(answerTextSpan);
+            containerDiv.appendChild(optionDiv);
+            if (isCrossOutToolActive && !isCrossedOut) {
+                const crossOutBtnIndividual = document.createElement('button');
+                crossOutBtnIndividual.className = 'individual-cross-out-btn';
+                crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+                crossOutBtnIndividual.title = `Cross out option ${key}`;
+                crossOutBtnIndividual.dataset.action = 'cross-out-individual';
+                containerDiv.appendChild(crossOutBtnIndividual);
+            } else if (isCrossedOut) {
+                const undoBtn = document.createElement('button');
+                undoBtn.className = 'undo-cross-out-btn';
+                undoBtn.textContent = 'Undo';
+                undoBtn.title = `Undo cross out for option ${key}`;
+                undoBtn.dataset.action = 'undo-cross-out';
+                containerDiv.appendChild(undoBtn);
+            }
+            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
+        }
+    }
+    
+    // --- 5. FINALIZE ---
+    if (typeof MathJax !== "undefined") {
+        if (MathJax.typesetPromise) {
+            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent]).catch(err => console.error('MathJax Typesetting Error:', err));
+        } else if (MathJax.startup && MathJax.startup.promise) {
+            MathJax.startup.promise.then(() => {
+                if(MathJax.typesetPromise) {
+                    MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent]).catch(err => console.error('MathJax Typesetting Error (after startup):', err));
+                }
+            }).catch(err => console.error("Error waiting for MathJax startup:", err));
+        }
+    }
+    updateNavigation();
+}
+
+
+/*
 // REPLACE your entire loadQuestion function with this corrected version
 
 function loadQuestion() {
@@ -710,7 +879,7 @@ function loadQuestion() {
     }
     updateNavigation();
 }
-
+*/
 
 /*
 // REPLACE your entire loadQuestion function with this one:
