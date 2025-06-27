@@ -97,7 +97,7 @@ const moduleMetadata = {
 };
 
 const GITHUB_JSON_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/json/';
-onst GITHUB_IMAGE_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/'; // <-- YOUR IMAGE REPO URL
+const GITHUB_IMAGE_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/'; // <-- YOUR IMAGE REPO URL
 
 
 async function loadQuizData(quizName) {
