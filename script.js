@@ -533,7 +533,182 @@ function showView(viewId) {
     updateNavigation();
 }
 
+// REPLACE your entire existing loadQuestion function with this one
 
+async function loadQuestion() {
+    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
+    
+    if (!testInterfaceViewEl.classList.contains('active')) {
+        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
+        return;
+    }
+    
+    const currentModuleInfo = getCurrentModule();
+    const currentQuestionDetails = getCurrentQuestionData();
+
+    if (!currentModuleInfo || !currentQuestionDetails) {
+        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
+        updateNavigation();
+        return;
+    }
+    
+    const answerState = getAnswerState();
+    if (!answerState) {
+        console.error("CRITICAL: answerState is null in loadQuestion. This should not happen.");
+        updateNavigation();
+        return;
+    }
+    questionStartTime = Date.now();
+
+    // --- 1. SET UP STATIC UI ELEMENTS (Header, Question Number, Tools) ---
+    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
+    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
+    
+    const isMathTypeModule = currentModuleInfo.type === "Math";
+    if(highlightsNotesBtn) highlightsNotesBtn.classList.toggle('hidden', isMathTypeModule);
+    if(calculatorBtnHeader) calculatorBtnHeader.classList.toggle('hidden', !isMathTypeModule);
+    if(referenceBtnHeader) referenceBtnHeader.classList.toggle('hidden', !isMathTypeModule);
+    if(crossOutToolBtnMain) crossOutToolBtnMain.classList.toggle('hidden', currentQuestionDetails.question_type === 'student_produced_response');
+    if(markReviewCheckboxMain) markReviewCheckboxMain.checked = answerState.marked;
+    if(flagIconMain) { /* ... flag logic ... */ }
+    if(mainContentAreaDynamic) mainContentAreaDynamic.classList.toggle('cross-out-active', isCrossOutToolActive && currentQuestionDetails.question_type !== 'student_produced_response');
+    if(crossOutToolBtnMain) crossOutToolBtnMain.classList.toggle('active', isCrossOutToolActive && currentQuestionDetails.question_type !== 'student_produced_response');
+
+    // --- 2. RESET ALL DYNAMIC CONTENT PANES AND IMAGES ---
+    passagePane.style.display = 'none';
+    sprInstructionsPane.style.display = 'none';
+    paneDivider.style.display = 'none';
+    mainContentAreaDynamic.classList.remove('single-pane');
+    if (passageContentEl) passageContentEl.innerHTML = '';
+    if (sprInstructionsContent) sprInstructionsContent.innerHTML = '';
+    if (questionTextMainEl) questionTextMainEl.innerHTML = '';
+    if (answerOptionsMainEl) answerOptionsMainEl.innerHTML = '';
+    sprInputContainerMain.style.display = 'none';
+    if (passageImageEl) {
+        passageImageEl.src = "";
+        passageImageEl.style.display = 'none';
+    }
+    if (questionImageEl) {
+        questionImageEl.src = "";
+        questionImageEl.style.display = 'none';
+    }
+
+    // --- 3. HANDLE IMAGE VISIBILITY AND PLACEMENT ---
+    const imageUrl = currentQuestionDetails.image_url;
+    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
+        const fullImageUrl = `https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/${imageUrl}`;
+        console.log(`DEBUG loadQuestion: Preparing to display image from ${fullImageUrl}`);
+        
+        const targetImageEl = (currentModuleInfo.type === 'RW') ? passageImageEl : questionImageEl;
+        if (targetImageEl) {
+            targetImageEl.src = fullImageUrl;
+            targetImageEl.style.display = 'block'; // Make the element visible so it can load
+        }
+    }
+
+    // --- 4. POPULATE TEXT CONTENT AND SET PANE LAYOUT ---
+    const passageTextFromJson = currentQuestionDetails.passage_content;
+    const stemTextFromJson = currentQuestionDetails.question_stem;
+    
+    if (currentQuestionDetails.question_type === 'student_produced_response') {
+        sprInstructionsPane.style.display = 'flex';
+        paneDivider.style.display = 'block';
+        if(sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
+        if(questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+        sprInputContainerMain.style.display = 'block';
+        if(sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
+    } else if (currentQuestionDetails.question_type && currentQuestionDetails.question_type.includes('multiple_choice')) {
+        if (passageTextFromJson && passageTextFromJson.trim() !== "") {
+            passagePane.style.display = 'flex';
+            paneDivider.style.display = 'block';
+            if(passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
+            if(questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+        } else {
+            mainContentAreaDynamic.classList.add('single-pane');
+            if(questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+        }
+
+        // --- 5. POPULATE MCQ OPTIONS (inside the MCQ block) ---
+        if (answerOptionsMainEl) {
+            answerOptionsMainEl.style.display = 'flex';
+            const options = {};
+            // ... (your existing logic to populate options object) ...
+            if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
+            if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
+            if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
+            if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
+            if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
+
+            for (const [key, value] of Object.entries(options)) {
+                // ... (your existing loop to create and append answer option elements) ...
+                const isSelected = (answerState.selected === value);
+                const isCrossedOut = answerState.crossedOut.includes(key);
+                const containerDiv = document.createElement('div');
+                containerDiv.className = 'answer-option-container';
+                containerDiv.dataset.optionKey = key;
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'answer-option';
+                if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
+                if (isCrossedOut) optionDiv.classList.add('crossed-out');
+                const answerLetterDiv = document.createElement('div');
+                answerLetterDiv.className = 'answer-letter';
+                if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
+                answerLetterDiv.textContent = key;
+                const answerTextSpan = document.createElement('span');
+                answerTextSpan.className = 'answer-text';
+                if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
+                answerTextSpan.innerHTML = value;
+                optionDiv.appendChild(answerLetterDiv);
+                optionDiv.appendChild(answerTextSpan);
+                containerDiv.appendChild(optionDiv);
+                if (isCrossOutToolActive && !isCrossedOut) {
+                    const crossOutBtnIndividual = document.createElement('button');
+                    crossOutBtnIndividual.className = 'individual-cross-out-btn';
+                    crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+                    crossOutBtnIndividual.title = `Cross out option ${key}`;
+                    crossOutBtnIndividual.dataset.action = 'cross-out-individual';
+                    containerDiv.appendChild(crossOutBtnIndividual);
+                } else if (isCrossedOut) {
+                    const undoBtn = document.createElement('button');
+                    undoBtn.className = 'undo-cross-out-btn';
+                    undoBtn.textContent = 'Undo';
+                    undoBtn.title = `Undo cross out for option ${key}`;
+                    undoBtn.dataset.action = 'undo-cross-out';
+                    containerDiv.appendChild(undoBtn);
+                }
+                answerOptionsMainEl.appendChild(containerDiv);
+            }
+        }
+    } else {
+        console.warn("loadQuestion: Unhandled question type:", currentQuestionDetails.question_type);
+    }
+    
+    // --- 6. TYPESET MATHJAX (at the very end) ---
+    if (typeof MathJax !== "undefined") {
+        if (MathJax.typesetPromise) {
+            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                .catch(function (err) { console.error('MathJax Typesetting Error:', err); });
+        } else if (MathJax.startup && MathJax.startup.promise) {
+            MathJax.startup.promise.then(() => {
+                if (MathJax.typesetPromise) {
+                     MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                        .catch(function (err) { console.error('MathJax Typesetting Error (after startup.promise):', err); });
+                } else {
+                    console.error("MathJax.typesetPromise still not available after startup.promise resolved.");
+                }
+            }).catch(err => console.error("Error waiting for MathJax startup:", err));
+        }
+    } else {
+        console.warn("MathJax object itself is not defined.");
+    }
+
+    // --- 7. UPDATE NAVIGATION BUTTONS ---
+    updateNavigation();
+}
+
+
+/*
 // --- Core UI Update `loadQuestion()` ---
 function loadQuestion() {
     console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
@@ -801,6 +976,8 @@ if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
     }
     updateNavigation();
 }
+
+*/
 
 // --- Event Listeners for Answer Interaction & Tools ---
 if(answerOptionsMainEl) {
