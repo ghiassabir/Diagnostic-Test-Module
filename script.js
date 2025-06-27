@@ -593,6 +593,8 @@ function loadQuestion() {
     answerOptionsMainEl.style.display = 'none';
     sprInputContainerMain.style.display = 'none';
 
+
+    /*
         // --- CHANGED: Added Image Handling Logic START ---
         // Reset both image elements first
         if (passageImageEl) {
@@ -630,8 +632,56 @@ function loadQuestion() {
             }
         }
         // --- CHANGED: Added Image Handling Logic END ---
+*/
 
 
+    // Inside async function loadQuestion() { ... }
+// REPLACE your existing "Image Handling Logic" block with this one.
+
+// --- START OF NEW ASYNC Image Handling Logic ---
+// Reset both image elements first
+if (passageImageEl) {
+    passageImageEl.src = "";
+    passageImageEl.style.display = 'none';
+}
+if (questionImageEl) {
+    questionImageEl.src = "";
+    questionImageEl.style.display = 'none';
+}
+
+const imageUrl = currentQuestionDetails.image_url;
+// Check if imageUrl exists and is a non-empty string
+if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
+    console.log(`DEBUG loadQuestion: Found image_url: ${imageUrl}`);
+    const fullImageUrl = `https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/${imageUrl}`;
+    console.log(`DEBUG loadQuestion: Constructing full image URL: ${fullImageUrl}`);
+    
+    // Determine which image element to use
+    const targetImageEl = (currentModuleInfo.type === 'RW') ? passageImageEl : questionImageEl;
+
+    if (targetImageEl) {
+        // Create a Promise to wait for the image to load
+        const loadImagePromise = new Promise((resolve, reject) => {
+            targetImageEl.onload = () => resolve();
+            targetImageEl.onerror = () => reject();
+            targetImageEl.src = fullImageUrl;
+        });
+
+        try {
+            // Wait for the image to finish loading or error out
+            await loadImagePromise;
+            targetImageEl.style.display = 'block'; // Show the image ONLY after it has loaded
+            console.log(`DEBUG loadQuestion: Image loaded and displayed successfully in ${(currentModuleInfo.type === 'RW') ? 'passage-pane' : 'question-pane'}.`);
+        } catch (error) {
+            console.error(`Error loading image: ${fullImageUrl}`, error);
+            targetImageEl.style.display = 'none'; // Ensure it stays hidden on error
+        }
+    }
+}
+// --- END OF NEW ASYNC Image Handling Logic ---
+
+// The rest of your loadQuestion function (populating text, options, calling MathJax)
+// will now wait until the await loadImagePromise is complete.
     
     const passageTextFromJson = currentQuestionDetails.passage_content;
     const stemTextFromJson = currentQuestionDetails.question_stem;
