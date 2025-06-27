@@ -97,6 +97,8 @@ const moduleMetadata = {
 };
 
 const GITHUB_JSON_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/json/';
+onst GITHUB_IMAGE_BASE_URL = 'https://raw.githubusercontent.com/ghiassabir/Bluebook-UI-UX-with-json-real-data-/main/data/images/'; // <-- YOUR IMAGE REPO URL
+
 
 async function loadQuizData(quizName) {
     let actualJsonFileToLoad = quizName;
@@ -163,6 +165,9 @@ const referenceSheetCloseBtn = document.getElementById('reference-sheet-close-bt
 const crossOutToolBtnMain = document.getElementById('cross-out-tool-btn-main');
 const sectionTitleHeader = document.getElementById('section-title-header');
 const passageContentEl = document.getElementById('passage-content');
+// ADD and RENAME these:
+const passageImageEl = document.getElementById('passage-image'); // New element in left pane
+const stemImageEl = document.getElementById('stem-image');       // Renamed element in right pane
 const questionTextMainEl = document.getElementById('question-text-main');
 const questionNumberBoxMainEl = document.getElementById('question-number-box-main');
 const markReviewCheckboxMain = document.getElementById('mark-review-checkbox-main');
@@ -531,7 +536,200 @@ function showView(viewId) {
     updateNavigation();
 }
 
+// REPLACE your entire loadQuestion function with this one:
+function loadQuestion() {
+    console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
+    
+    if (!testInterfaceViewEl.classList.contains('active')) {
+        console.warn("DEBUG loadQuestion: Not in test-interface-view, exiting.");
+        return;
+    }
+    
+    const currentModuleInfo = getCurrentModule(); 
+    const currentQuestionDetails = getCurrentQuestionData();
 
+    // --- Reset all content areas and hide images first ---
+    passagePane.style.display = 'none';
+    if (passageContentEl) passageContentEl.innerHTML = ''; 
+    if (passageImageEl) {
+        passageImageEl.src = '';
+        passageImageEl.classList.add('hidden');
+    }
+    sprInstructionsPane.style.display = 'none';
+    if (sprInstructionsContent) sprInstructionsContent.innerHTML = ''; 
+    if (questionTextMainEl) questionTextMainEl.innerHTML = ''; 
+    if (stemImageEl) {
+        stemImageEl.src = '';
+        stemImageEl.classList.add('hidden');
+    }
+    if (answerOptionsMainEl) answerOptionsMainEl.innerHTML = ''; 
+    paneDivider.style.display = 'none';
+    mainContentAreaDynamic.classList.remove('single-pane');
+    answerOptionsMainEl.style.display = 'none'; 
+    sprInputContainerMain.style.display = 'none';
+    
+    // --- Central check for valid data ---
+    if (!currentModuleInfo || !currentQuestionDetails) {
+        console.error("loadQuestion: ModuleInfo or Question data is null/undefined. Aborting question load.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Critical data missing.</p>";
+        updateNavigation();
+        return;
+    }
+    
+    // This getAnswerState call also ensures the answer object is initialized for the current question
+    const answerState = getAnswerState();
+    if (!answerState) {
+        console.error("CRITICAL: answerState is null in loadQuestion. This should not happen.");
+        if (questionTextMainEl) questionTextMainEl.innerHTML = "<p>Error: Internal state error.</p>";
+        updateNavigation();
+        return;
+    }
+    questionStartTime = Date.now();
+
+    // --- Populate Header/Tool states (no change from before) ---
+    if(sectionTitleHeader) sectionTitleHeader.textContent = `Section ${currentModuleIndex + 1}: ${currentModuleInfo.name}`;
+    if(questionNumberBoxMainEl) questionNumberBoxMainEl.textContent = currentQuestionDetails.question_number || currentQuestionNumber;
+    // ... (all the other header/tool visibility logic remains the same)
+
+    // --- Prepare Image URL ---
+    let fullImageUrl = null;
+    if (currentQuestionDetails.image_url) {
+        fullImageUrl = GITHUB_IMAGE_BASE_URL + currentQuestionDetails.image_url;
+        console.log("DEBUG loadQuestion: Constructed image URL:", fullImageUrl);
+    }
+
+    // --- NEW UNIFIED PANE & CONTENT LOGIC ---
+    const passageTextFromJson = currentQuestionDetails.passage_content;
+    const stemTextFromJson = currentQuestionDetails.question_stem;
+
+    if (currentQuestionDetails.question_type === 'student_produced_response') {
+        // SPR: Instructions Left, Stem/Input Right
+        mainContentAreaDynamic.classList.remove('single-pane');
+        sprInstructionsPane.style.display = 'flex';
+        paneDivider.style.display = 'block';
+        if (sprInstructionsContent) sprInstructionsContent.innerHTML = (currentModuleInfo.spr_directions || '') + (currentModuleInfo.spr_examples_table || '');
+        
+        if (fullImageUrl && stemImageEl) {
+            stemImageEl.src = fullImageUrl;
+            stemImageEl.classList.remove('hidden');
+        }
+        if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+        sprInputContainerMain.style.display = 'block';
+        if (sprInputFieldMain) sprInputFieldMain.value = answerState.spr_answer || '';
+        if (sprAnswerPreviewMain) sprAnswerPreviewMain.textContent = `Answer Preview: ${answerState.spr_answer || ''}`;
+        
+    } else if (currentQuestionDetails.question_type.includes('multiple_choice')) {
+        // MCQ (covers both Math and R&W)
+        answerOptionsMainEl.style.display = 'flex';
+
+        if (passageTextFromJson && passageTextFromJson.trim() !== "") {
+            // Two-pane layout (typical for R&W)
+            mainContentAreaDynamic.classList.remove('single-pane');
+            passagePane.style.display = 'flex';
+            paneDivider.style.display = 'block';
+            
+            if (fullImageUrl && passageImageEl) {
+                passageImageEl.src = fullImageUrl;
+                passageImageEl.classList.remove('hidden');
+            }
+            if (passageContentEl) passageContentEl.innerHTML = passageTextFromJson;
+            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+
+        } else {
+            // Single-pane layout (typical for Math)
+            mainContentAreaDynamic.classList.add('single-pane');
+            if (fullImageUrl && stemImageEl) {
+                stemImageEl.src = fullImageUrl;
+                stemImageEl.classList.remove('hidden');
+            }
+            if (questionTextMainEl) questionTextMainEl.innerHTML = stemTextFromJson ? `<p>${stemTextFromJson}</p>` : '';
+        }
+
+        // MCQ Option rendering logic (this part remains the same)
+        const options = {};
+        // ... (populate options A,B,C,D,E)
+        if (currentQuestionDetails.option_a !== undefined && currentQuestionDetails.option_a !== null) options['A'] = currentQuestionDetails.option_a;
+        if (currentQuestionDetails.option_b !== undefined && currentQuestionDetails.option_b !== null) options['B'] = currentQuestionDetails.option_b;
+        if (currentQuestionDetails.option_c !== undefined && currentQuestionDetails.option_c !== null) options['C'] = currentQuestionDetails.option_c;
+        if (currentQuestionDetails.option_d !== undefined && currentQuestionDetails.option_d !== null) options['D'] = currentQuestionDetails.option_d;
+        if (currentQuestionDetails.option_e !== undefined && currentQuestionDetails.option_e !== null && String(currentQuestionDetails.option_e).trim() !== "") options['E'] = currentQuestionDetails.option_e;
+
+        for (const [key, value] of Object.entries(options)) {
+            // ... (your existing option rendering code)
+            const isSelected = (answerState.selected === value);
+            const isCrossedOut = answerState.crossedOut.includes(key);
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'answer-option-container';
+            containerDiv.dataset.optionKey = key;
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'answer-option';
+            if (isSelected && !isCrossedOut) optionDiv.classList.add('selected');
+            if (isCrossedOut) optionDiv.classList.add('crossed-out');
+            const answerLetterDiv = document.createElement('div');
+            answerLetterDiv.className = 'answer-letter';
+            if (isSelected && !isCrossedOut) answerLetterDiv.classList.add('selected');
+            answerLetterDiv.textContent = key;
+            const answerTextSpan = document.createElement('span');
+            answerTextSpan.className = 'answer-text';
+            if (isCrossedOut) answerTextSpan.classList.add('text-dimmed-for-crossout');
+            answerTextSpan.innerHTML = value; 
+            optionDiv.appendChild(answerLetterDiv);
+            optionDiv.appendChild(answerTextSpan);
+            containerDiv.appendChild(optionDiv);
+            if (isCrossOutToolActive && !isCrossedOut) {
+                const crossOutBtnIndividual = document.createElement('button');
+                crossOutBtnIndividual.className = 'individual-cross-out-btn';
+                crossOutBtnIndividual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+                crossOutBtnIndividual.title = `Cross out option ${key}`;
+                crossOutBtnIndividual.dataset.action = 'cross-out-individual';
+                containerDiv.appendChild(crossOutBtnIndividual);
+            } else if (isCrossedOut) {
+                const undoBtn = document.createElement('button');
+                undoBtn.className = 'undo-cross-out-btn';
+                undoBtn.textContent = 'Undo';
+                undoBtn.title = `Undo cross out for option ${key}`;
+                undoBtn.dataset.action = 'undo-cross-out';
+                containerDiv.appendChild(undoBtn);
+            }
+            if (answerOptionsMainEl) answerOptionsMainEl.appendChild(containerDiv);
+        }
+    }
+    
+    // Call MathJax for all potentially updated content areas
+    if (typeof MathJax !== "undefined") {
+          if (MathJax.typesetPromise) {
+            MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                .catch(function (err) { console.error('MathJax Typesetting Error:', err); });
+        } else if (MathJax.startup && MathJax.startup.promise) {
+            MathJax.startup.promise.then(() => {
+                if (MathJax.typesetPromise) {
+                     MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                        .catch(function (err) { console.error('MathJax Typesetting Error (after startup.promise):', err); });
+                } else {
+                    console.error("MathJax.typesetPromise still not available after startup.promise resolved.");
+                }
+            }).catch(err => console.error("Error waiting for MathJax startup:", err));
+        } else {
+            console.warn("MathJax is defined, but neither typesetPromise nor startup.promise is available. Typesetting may fail.");
+            setTimeout(() => {
+                if (typeof MathJax !== "undefined" && MathJax.typesetPromise) {
+                    MathJax.typesetPromise([passageContentEl, questionTextMainEl, answerOptionsMainEl, sprInstructionsContent])
+                        .catch(function (err) { console.error('MathJax Typesetting Error (after delay):', err); });
+                } else {
+                     console.warn("MathJax still not ready after delay for typesetting.");
+                }
+            }, 500);
+        }
+    } else {
+        console.warn("MathJax object itself is not defined. Math content will not be rendered.");
+    }
+   updateNavigation();
+}
+
+
+
+
+/*
 // --- Core UI Update `loadQuestion()` ---
 function loadQuestion() {
     console.log(`DEBUG loadQuestion: CALLED. CMI: ${currentModuleIndex}, CQN: ${currentQuestionNumber}, Mode: ${currentInteractionMode}`);
@@ -708,7 +906,7 @@ function loadQuestion() {
     }
     updateNavigation();
 }
-
+*/
 // --- Event Listeners for Answer Interaction & Tools ---
 if(answerOptionsMainEl) {
     answerOptionsMainEl.addEventListener('click', function(event) {
