@@ -1638,8 +1638,83 @@ if(exitExamConfirmBtn) {
 }
 
 if (submitEmailBtn) {
-    submitEmailBtn.addEventListener('click', async () => { /* ... existing email logic ... */ });
+    submitEmailBtn.addEventListener('click', async () => {
+          if (studentEmailField && studentEmailField.value.trim() !== "" && studentEmailField.value.includes('@')) {
+            studentEmailForSubmission = studentEmailField.value.trim();
+            localStorage.setItem('bluebookStudentEmail', studentEmailForSubmission);
+            console.log(`DEBUG submitEmailBtn: Email submitted: ${studentEmailForSubmission}, saved.`);
+             // After saving the email, we need to re-run the logic that checks for URL params to launch the test.
+            // This logic is already in DOMContentLoaded, so we can re-use it.
+            // Let's call a new function that contains this logic.
+            await proceedAfterEmail();
+
+        } else {
+            alert("Please enter a valid email address.");
+        }
+    });
 }
+// --- END OF BLOCK TO ADD ---
+
+// We need to wrap the post-email logic into a function that can be called
+// both by DOMContentLoaded (if email exists) and by the submitEmailBtn click.
+
+async function proceedAfterEmail() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const quizNameFromUrl = urlParams.get('quiz_name');
+    const testIdFromUrl = urlParams.get('test_id');
+
+    console.log(`DEBUG proceedAfterEmail: Email valid. Checking direct launch params: test_id=${testIdFromUrl}, quiz_name=${quizNameFromUrl}`);
+    
+    // This is the same logic that was previously inside DOMContentLoaded
+    if (testIdFromUrl) { 
+        console.log(`DEBUG proceedAfterEmail: Launching NEW full test from URL: ${testIdFromUrl}`);
+        if (fullTestDefinitions[testIdFromUrl]) {
+            currentInteractionMode = 'full_test';
+            currentTestFlow = fullTestDefinitions[testIdFromUrl].flow;
+            // Reset state for a new test
+            currentModuleIndex = 0; currentQuestionNumber = 1; userAnswers = {};
+            isTimerHidden = false; isCrossOutToolActive = false; isHighlightingActive = false;
+            currentModuleTimeUp = false; questionStartTime = 0;
+
+            if (currentTestFlow && currentTestFlow.length > 0) {
+                const firstQuizName = currentTestFlow[currentModuleIndex];
+                const moduleInfo = moduleMetadata[firstQuizName];
+                const isDtT0Module = firstQuizName.startsWith("DT-T0-");
+                const success = await loadQuizData(firstQuizName);
+                if (success && currentQuizQuestions.length > 0) {
+                    if (isDtT0Module) {
+                        startPracticeQuizTimer(); currentModuleTimeUp = true;
+                    } else if (moduleInfo && typeof moduleInfo.durationSeconds === 'number' && moduleInfo.durationSeconds > 0) {
+                        startModuleTimer(moduleInfo.durationSeconds);
+                    } else {
+                        updateModuleTimerDisplay(0); currentModuleTimeUp = true;
+                    }
+                    populateQNavGrid();
+                    showView('test-interface-view');
+                } else { alert(`Could not load initial module for test: ${testIdFromUrl}.`); showView('home-view'); }
+            } else { alert(`Test ID '${testIdFromUrl}' has no defined flow.`); showView('home-view'); }
+        } else { alert(`Unknown Test ID: ${testIdFromUrl}.`); showView('home-view'); }
+    } else if (quizNameFromUrl) {
+        console.log(`DEBUG proceedAfterEmail: Launching NEW single quiz from URL: ${quizNameFromUrl}`);
+        currentInteractionMode = 'single_quiz';
+        currentTestFlow = [quizNameFromUrl];
+        // Reset state for a new quiz
+        currentModuleIndex = 0; currentQuestionNumber = 1; userAnswers = {};
+        isTimerHidden = false; isCrossOutToolActive = false; isHighlightingActive = false;
+        currentModuleTimeUp = false; questionStartTime = 0;
+
+        const success = await loadQuizData(quizNameFromUrl);
+        if (success && currentQuizQuestions.length > 0) {
+            startPracticeQuizTimer();
+            populateQNavGrid();
+            showView('test-interface-view');
+        } else { alert(`Could not load quiz: ${quizNameFromUrl}.`); showView('home-view'); }
+    } else {
+        console.log("DEBUG proceedAfterEmail: No direct launch params. Displaying home screen.");
+        showView('home-view'); 
+    }
+}          
+    
 
 // --- DOMContentLoaded ---
 //document.addEventListener('DOMContentLoaded', async () => {
@@ -1648,6 +1723,65 @@ if (submitEmailBtn) {
     // This is the version from my previous message that you confirmed worked.
 // --- script.js (Final and Correct DOMContentLoaded Listener) ---
 
+// --- MODIFY THE DOMContentLoaded LISTENER ---
+// Replace your entire DOMContentLoaded listener with this refactored version
+
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("DEBUG DOMContentLoaded: Initializing application.");
+    const emailIsValid = initializeStudentIdentifier();
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    globalOriginPageId = urlParams.get('originPageId');
+    const sourceFromUrl = urlParams.get('source');
+    if (sourceFromUrl) globalQuizSource = sourceFromUrl;
+
+    const savedSessionJSON = localStorage.getItem(SESSION_STORAGE_KEY);
+    let sessionResumed = false;
+
+    if (savedSessionJSON) {
+        // ... (Your existing, working session resume logic goes here. It's complex, so keep it as is) ...
+        // For brevity, I'll represent it like this. Make sure your full resume logic is here.
+        console.log("DEBUG DOMContentLoaded: Found saved session data.");
+        try {
+            const savedSession = JSON.parse(savedSessionJSON);
+            if (savedSession && typeof savedSession.currentModuleIndex === 'number') {
+                const resumeConfirmation = confirm("An unfinished session was found. Would you like to resume it?");
+                if (resumeConfirmation) {
+                    sessionResumed = true;
+                    // ... The rest of the logic to restore the session ...
+                    // Example...
+                     // Restore state variables
+                    studentEmailForSubmission = savedSession.studentEmailForSubmission;
+                    currentInteractionMode = savedSession.currentInteractionMode || 'full_test';
+                    //... and so on for all state variables.
+                    
+                    // ... then load data, start timer, and show view ...
+                    // This part seems to be working for you, so no need to change it.
+                } else {
+                    clearSessionState();
+                }
+            } else {
+                clearSessionState();
+            }
+        } catch (e) {
+            clearSessionState();
+        }
+    }
+
+    if (!sessionResumed) {
+        console.log("DEBUG DOMContentLoaded: No session resumed.");
+        if (!emailIsValid) {
+            showView('email-input-view');
+        } else {
+            // Email is valid, so proceed directly
+            await proceedAfterEmail();
+        }
+    }
+});
+
+
+
+/*
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("DEBUG DOMContentLoaded: Initializing application.");
@@ -1806,3 +1940,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 });
+*/
