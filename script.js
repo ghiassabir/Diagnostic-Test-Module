@@ -75,6 +75,8 @@ let globalQuizSource = null;
 const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwneCF0xq9X-F-9AIxAiHpYFmRTErCzCPXlsWRloLRDWBGqwLEZC4NldCCAuND0jxUL/exec';
 const SESSION_STORAGE_KEY = 'bluebookQuizSession';
 
+const DIAGNOSTIC_STATE_KEY = 'diagnosticTestState'; 
+
 const fullTestDefinitions = {
     "DT-T0": {
         flow: ["DT-T0-RW-M1", "DT-T0-RW-M2", "DT-T0-MT-M1", "DT-T0-MT-M2"],
@@ -862,7 +864,24 @@ async function submitCurrentModuleData(moduleIndexToSubmit, isFinalSubmission = 
         return true;
     }
     console.log(`DEBUG submitCurrentModuleData: Submitting for module ${quizNameForSubmission}:`, submissions);
-    if (APPS_SCRIPT_WEB_APP_URL === 'YOUR_CORRECT_BLUEBOOK_APPS_SCRIPT_URL_HERE' || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
+    // CHANGED: ADD this block to save completion state
+    
+    // If submission is successful (or even if it just finishes attempt), mark module as completed.
+    if (globalQuizSource === 'diagnostic') {
+        try {
+            const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+            const state = stateJSON ? JSON.parse(stateJSON) : {};
+            const completedQuizName = currentTestFlow[moduleIndexToSubmit]; // e.g., "DT-T0-RW-M1"
+            state[completedQuizName + '_completed'] = true;
+            localStorage.setItem(DIAGNOSTIC_STATE_KEY, JSON.stringify(state));
+            console.log(`DEBUG submitCurrentModuleData: Marked ${completedQuizName} as completed in localStorage.`);
+        } catch (e) {
+            console.error("Error updating diagnostic completion state in localStorage", e);
+        }
+    }
+    // END CHANGED
+    
+        if (APPS_SCRIPT_WEB_APP_URL === 'YOUR_CORRECT_BLUEBOOK_APPS_SCRIPT_URL_HERE' || !APPS_SCRIPT_WEB_APP_URL.startsWith('https://script.google.com/')) {
         console.warn("APPS_SCRIPT_WEB_APP_URL not set or invalid. Submission will not proceed for module " + quizNameForSubmission);
         alert("Submission URL not configured. Data for module " + quizNameForSubmission + " logged to console.");
         return false;
@@ -1071,7 +1090,9 @@ if(backBtnFooter) {
 if(returnToHomeBtn) {
     returnToHomeBtn.addEventListener('click', () => {
         console.log(`DEBUG returnToHomeBtn: Clicked. globalOriginPageId: '${globalOriginPageId}'`);
+        
         clearSessionState();
+        
         if (globalOriginPageId && globalOriginPageId.trim() !== "") {
             let returnUrl = "";
             if (window.location.pathname.includes("/quiz-player/")) {
