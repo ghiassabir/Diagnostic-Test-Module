@@ -977,7 +977,28 @@ async function reviewNextButtonClickHandler() {
     saveSessionState();
 
     const moduleIndexJustCompleted = currentModuleIndex;
+    const quizNameJustCompleted = currentTestFlow[moduleIndexJustCompleted];
 
+    // This call already submits the data
+    await submitCurrentModuleData(moduleIndexJustCompleted, (moduleIndexJustCompleted === currentTestFlow.length - 1)); 
+
+    // --- NEW LOGIC FOR DIAGNOSTIC HUB ---
+    // Check if we came from the diagnostic hub page
+    if (globalOriginPageId === 'index') { // Assumes originPageId is 'index' for diagnostic hub
+        console.log("DEBUG: Updating diagnostic test state from quiz player.");
+        const DIAGNOSTIC_TEST_STATE_KEY = 'diagnosticTestState_DT-T0'; // Must match key in index.html
+        let diagnosticStateJSON = localStorage.getItem(DIAGNOSTIC_TEST_STATE_KEY);
+        let diagnosticState = diagnosticStateJSON ? JSON.parse(diagnosticStateJSON) : {};
+        
+        // Mark the module just completed as true
+        diagnosticState[quizNameJustCompleted] = true; 
+        
+        localStorage.setItem(DIAGNOSTIC_TEST_STATE_KEY, JSON.stringify(diagnosticState));
+        console.log(`Updated diagnostic test state for ${quizNameJustCompleted}. State is now:`, diagnosticState);
+    }
+    // --- END OF NEW LOGIC ---
+
+    
     if (currentInteractionMode === 'single_quiz') {
         console.log("DEBUG reviewNextBtnHandler: Single quiz finished. Submitting module data.");
         await submitCurrentModuleData(moduleIndexJustCompleted, true);
