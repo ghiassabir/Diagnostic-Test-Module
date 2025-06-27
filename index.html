@@ -1,23 +1,192 @@
-// In quiz.html's script.js
-if (submitEmailBtn) {
-    submitEmailBtn.addEventListener('click', () => { 
-        console.log("DEBUG: Fallback email prompt's Continue button clicked.");
-        if (studentEmailField && studentEmailField.value.trim() !== "" && studentEmailField.value.includes('@')) {
-            studentEmailForSubmission = studentEmailField.value.trim();
-            localStorage.setItem('bluebookStudentEmail', studentEmailForSubmission);
-            console.log(`DEBUG submitEmailBtn: Email submitted and saved: ${studentEmailForSubmission}`);
-            
-            // Disable the button to prevent multiple clicks and provide feedback
-            submitEmailBtn.disabled = true;
-            submitEmailBtn.textContent = 'Processing...';
-
-            startAppOrQuiz(); // Call the main logic function
-
-        } else {
-            alert("Please enter a valid email address.");
-            // Re-enable button if input was invalid
-            submitEmailBtn.disabled = false;
-            submitEmailBtn.textContent = 'Continue';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostic Test Launcher</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Inter', sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f4f8; color: #1e293b;
+            display: flex; justify-content: center; align-items: center;
         }
-    });
-}
+        .launcher-container {
+            background-color: white; padding: 2.5rem 3rem; border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center;
+            border: 1px solid #e2e8f0; max-width: 500px; width: 90%;
+        }
+        .launcher-header {
+            display: flex; flex-direction: column; align-items: center;
+            margin-bottom: 2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1.5rem;
+        }
+        .launcher-logo { font-size: 1.75rem; font-weight: bold; color: #003366; margin-bottom: 0.5rem; }
+        .launcher-title { font-size: 1.25rem; font-weight: 600; color: #475569; }
+        .module-buttons-container { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+        .module-button {
+            display: block; width: 100%; padding: 1rem; font-size: 1.125rem; font-weight: 600;
+            border-radius: 0.5rem; border: 2px solid transparent; cursor: pointer;
+            text-decoration: none; transition: all 0.2s ease-in-out; box-sizing: border-box;
+        }
+        .module-button.active { background-color: #2563eb; color: white; border-color: #2563eb; }
+        .module-button.active:hover { background-color: #1d4ed8; }
+        .module-button.completed {
+            background-color: #e0e7ff; color: #4338ca; border-color: #a5b4fc;
+            cursor: not-allowed; opacity: 0.8; position: relative;
+        }
+        .module-button.completed::after {
+            content: '✔ Completed'; position: absolute; right: 1rem;
+            font-weight: bold; color: #16a34a;
+        }
+        .module-button.disabled { background-color: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+        .results-button.active { background-color: #facc15; color: #422006; border-color: #facc15; }
+        .results-button.active:hover { background-color: #eab308; }
+
+        /* CSS FOR THE EMAIL MODAL */
+        .modal-overlay {
+            position: fixed; inset: 0; background-color: rgba(0,0,0,0.6);
+            display: none; align-items: center; justify-content: center; z-index: 100;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal-content {
+            background-color: white; padding: 2.5rem; border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;
+            text-align: center;
+        }
+        .modal-content h2 { font-size: 1.75rem; font-weight: bold; margin-bottom: 1rem; color: #003366; }
+        .modal-content p { font-size: 1rem; color: #475569; margin-bottom: 1.5rem; }
+        .modal-content input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e0; border-radius: 0.375rem; margin-bottom: 1.5rem; font-size: 1rem; box-sizing: border-box; }
+        .modal-content button {
+            padding: 0.75rem 3rem; width: 100%; border-radius: 9999px; font-weight: bold; font-size: 1rem;
+            cursor: pointer; border: none; background-color: #facc15; color: #422006;
+        }
+    </style>
+</head>
+<body>
+    <div class="launcher-container">
+        <div class="launcher-header">
+            <h1 class="launcher-logo">SAT Hub</h1>
+            <h2 class="launcher-title">Diagnostic Test</h2>
+        </div>
+        
+        <div class="module-buttons-container">
+            <a id="module1-btn" href="quiz.html?quiz_name=DT-T0-RW-M1&originPageId=index&source=diagnostic" class="module-button">Reading & Writing - Module 1</a>
+            <a id="module2-btn" href="quiz.html?quiz_name=DT-T0-RW-M2&originPageId=index&source=diagnostic" class="module-button">Reading & Writing - Module 2</a>
+            <a id="module3-btn" href="quiz.html?quiz_name=DT-T0-MT-M1&originPageId=index&source=diagnostic" class="module-button">Math - Module 1</a>
+            <a id="module4-btn" href="quiz.html?quiz_name=DT-T0-MT-M2&originPageId=index&source=diagnostic" class="module-button">Math - Module 2</a>
+        </div>
+
+        <a id="results-btn" href="YOUR_DASHBOARD_URL_HERE.html" class="module-button results-button disabled">View Results</a>
+    </div>
+
+    <!-- EMAIL MODAL OVERLAY -->
+    <div id="email-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Enter Your Email</h2>
+            <p>Please enter your email to start your session.</p>
+            <input type="email" id="email-modal-input" placeholder="your.email@example.com">
+            <button id="email-modal-submit">Continue to Quiz</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("Launcher page (index.html) script loaded.");
+
+            const buttons = {
+                m1: document.getElementById('module1-btn'),
+                m2: document.getElementById('module2-btn'),
+                m3: document.getElementById('module3-btn'),
+                m4: document.getElementById('module4-btn'),
+                results: document.getElementById('results-btn')
+            };
+
+            const emailModal = document.getElementById('email-modal');
+            const emailInput = document.getElementById('email-modal-input');
+            const emailSubmitBtn = document.getElementById('email-modal-submit');
+            let targetUrl = ''; // This will store the quiz URL the user intended to go to
+
+            const DIAGNOSTIC_STATE_KEY = 'diagnosticTestState';
+
+            function getDiagnosticState() {
+                const stateJSON = localStorage.getItem(DIAGNOSTIC_STATE_KEY);
+                console.log(`Launcher reading '${DIAGNOSTIC_STATE_KEY}':`, stateJSON);
+                return stateJSON ? JSON.parse(stateJSON) : {};
+            }
+            
+            function updateButtonStates() {
+                const state = getDiagnosticState();
+                
+                const setButtonState = (button, isActive, isCompleted, link) => {
+                    button.className = 'module-button'; // Reset classes
+                    button.href = '#'; 
+                    if (isCompleted) {
+                        button.classList.add('completed');
+                    } else if (isActive) {
+                        button.classList.add('active');
+                        button.href = link; 
+                    } else {
+                        button.classList.add('disabled');
+                    }
+                };
+                
+                const originalLinks = {
+                    m1: "quiz.html?quiz_name=DT-T0-RW-M1&originPageId=index&source=diagnostic",
+                    m2: "quiz.html?quiz_name=DT-T0-RW-M2&originPageId=index&source=diagnostic",
+                    m3: "quiz.html?quiz_name=DT-T0-MT-M1&originPageId=index&source=diagnostic",
+                    m4: "quiz.html?quiz_name=DT-T0-MT-M2&originPageId=index&source=diagnostic",
+                    results: "YOUR_DASHBOARD_URL_HERE.html"
+                };
+
+                setButtonState(buttons.m1, !state.DT_T0_RW_M1_completed, state.DT_T0_RW_M1_completed, originalLinks.m1);
+                setButtonState(buttons.m2, state.DT_T0_RW_M1_completed && !state.DT_T0_RW_M2_completed, state.DT_T0_RW_M2_completed, originalLinks.m2);
+                setButtonState(buttons.m3, state.DT_T0_RW_M2_completed && !state.DT_T0_MT_M1_completed, state.DT_T0_MT_M1_completed, originalLinks.m3);
+                setButtonState(buttons.m4, state.DT_T0_MT_M1_completed && !state.DT_T0_MT_M2_completed, state.DT_T0_MT_M2_completed, originalLinks.m4);
+                
+                buttons.results.classList.remove('active', 'disabled');
+                buttons.results.classList.add('results-button');
+                if (state.DT_T0_MT_M2_completed) {
+                    buttons.results.classList.add('active');
+                    buttons.results.href = originalLinks.results;
+                } else {
+                    buttons.results.classList.add('disabled');
+                    buttons.results.href = '#';
+                }
+            }
+
+            // Attach click listeners to all module buttons
+            document.querySelectorAll('.module-button:not(#results-btn)').forEach(button => {
+                button.addEventListener('click', function(event) {
+                    if (this.classList.contains('disabled') || this.classList.contains('completed')) {
+                        event.preventDefault(); return;
+                    }
+                    event.preventDefault(); 
+                    targetUrl = this.href; 
+                    const storedEmail = localStorage.getItem('bluebookStudentEmail');
+                    if (storedEmail && storedEmail.includes('@')) {
+                        window.location.href = targetUrl;
+                    } else {
+                        emailInput.value = '';
+                        emailModal.classList.add('visible');
+                    }
+                });
+            });
+
+            // Handle submission from the email modal
+            emailSubmitBtn.addEventListener('click', () => {
+                const email = emailInput.value.trim();
+                if (email && email.includes('@')) {
+                    localStorage.setItem('bluebookStudentEmail', email);
+                    emailSubmitBtn.disabled = true;
+                    emailSubmitBtn.textContent = 'Proceeding...';
+                    window.location.href = targetUrl;
+                } else {
+                    alert("Please enter a valid email address.");
+                }
+            });
+            
+            updateButtonStates();
+        });
+    </script>
+</body>
+</html>
