@@ -108,9 +108,15 @@
         .passage-pane, .question-pane, .spr-instructions-pane {
             padding: 1.5rem; overflow-y: auto; box-sizing: border-box; background-color: white;
         }
-        .passage-pane { flex-basis: 50%; border-right: 1px solid var(--bluebook-pane-divider); }
-        .spr-instructions-pane { flex-basis: 50%; border-right: 1px solid var(--bluebook-pane-divider); }
-        .question-pane { flex-basis: 50%; background-color: #f9fafb; }
+        .passage-pane { flex-basis: 50%; border-right: 1px solid var(--bluebook-pane-divider); display: flex; /* Make it a flex container */
+        flex-direction: column; /* Stack children vertically */
+        align-items: center; /* Center children horizontally (including image) */ }
+        .spr-instructions-pane { flex-basis: 50%; border-right: 1px solid var(--bluebook-pane-divider); display: flex; /* Ensure this is also a flex column if it can host images or structured content */
+        flex-direction: column;
+        align-items: center; }
+        .question-pane { flex-basis: 50%; background-color: #f9fafb; display: flex; /* Make it a flex container */
+        flex-direction: column; /* Stack children vertically */
+        align-items: center; /* Center children horizontally (including image) */ }
         .passage-content p, .question-text p, .spr-instructions-content p, .spr-instructions-content li { font-size: 1rem; line-height: 1.6; }
         .passage-content p + p, .spr-instructions-content p + p { margin-top: 1em; }
          .spr-instructions-content h3 { font-size: 1.125rem; font-weight: bold; margin-bottom: 0.75rem;}
@@ -437,7 +443,7 @@
 
     #question-image {
         /* Style for images in the right (question) pane - typically Math */
-        max-width: 80%; /* Math images constrained to 80% */
+        max-width: 70%; /* Math images constrained to 80% */
         height: auto; 
         display: block; /* Ensure it acts as a block element for margin:auto to work */
         margin: 0 auto 1rem auto; /* Center it horizontally and add some space below */
@@ -448,6 +454,19 @@
     /* Ensure your .hidden class is correctly defined to apply display: none !important; */
     .hidden {
         display: none !important;
+    }
+
+
+        /* Text content within panes might also need minor adjustment for alignment if affected */
+    .passage-content, .question-text, .spr-instructions-content {
+        align-self: stretch; /* Allows text content to take full width */
+        text-align: left; /* Ensure text alignment is left within its stretched container */
+    }
+
+    /* Specific adjustment for passage content when image is present, if needed */
+    .passage-pane:has(#passage-image:not(.hidden)) .passage-content {
+        /* Add specific styles here if the text needs different spacing when an image is present */
+        margin-top: 1rem; /* Example: add some space between image and text */
     }
 
         
